@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --font-ui: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+.mono {
+    font-family: var(--font-mono);
+}
+
+@layer base {
+    /* Cigs is dark-only. The single palette lives on :root so the app is
+       dark with or without the .dark class; .dark mirrors it for any
+       component (e.g. sonner) that keys off the class. */
+    :root,
+    .dark {
+        --background: 220 24% 5%;
+        --foreground: 220 60% 96%;
+        --card: 222 26% 7.5%;
+        --card-foreground: 220 60% 96%;
+        --popover: 222 26% 8%;
+        --popover-foreground: 220 60% 96%;
+        --primary: 145 100% 62%;
+        --primary-foreground: 220 30% 6%;
+        --secondary: 222 22% 12%;
+        --secondary-foreground: 220 60% 96%;
+        --muted: 222 18% 12%;
+        --muted-foreground: 220 12% 66%;
+        --accent: 258 100% 70%;
+        --accent-foreground: 220 60% 98%;
+        --destructive: 342 100% 62%;
+        --destructive-foreground: 220 60% 98%;
+        --warning: 38 100% 58%;
+        --info: 218 100% 72%;
+        --border: 220 20% 15%;
+        --input: 220 20% 15%;
+        --ring: 145 100% 62%;
+        --radius: 0.625rem;
+        --void: 222 32% 3%;
+        --surface-2: 222 24% 10%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply text-foreground;
+        background-color: hsl(var(--void));
+    }
+    ::selection {
+        background: hsl(var(--primary) / 0.26);
+        color: hsl(var(--foreground));
+    }
+}
+
+@layer utilities {
+    .font-mono,
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+    .text-warning {
+        color: hsl(var(--warning));
+    }
+    .text-info {
+        color: hsl(var(--info));
+    }
+    .bg-void {
+        background-color: hsl(var(--void));
+    }
+    .bg-surface-2 {
+        background-color: hsl(var(--surface-2));
+    }
+
+    /* Procedural noise overlay (no external image). Scoped to hero/hub areas
+       only — used sparingly to keep the rest of the app calm. */
+    .cigs-noise::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.5;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    }
+
+    /* Faint grid lines for the hub stage (radial-masked). */
+    .cigs-grid {
+        background-image:
+            linear-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(var(--border) / 0.5) 1px, transparent 1px);
+        background-size: 24px 24px;
+        background-position: center;
+        -webkit-mask-image: radial-gradient(circle at center, black 36%, transparent 72%);
+        mask-image: radial-gradient(circle at center, black 36%, transparent 72%);
+    }
+}
+
+/* ===== Motion — deliberate and quiet. No looping scanline, no sweeping
+   shimmer. A single soft pulse for "live" affordances only. ===== */
+@keyframes cigs-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+.cigs-pulse {
+    animation: cigs-pulse 1.8s ease-in-out infinite;
+}
+
+/* Elevation — crisp 1px top highlight + soft drop. No glass, no glow. */
+.cigs-elev-1 {
+    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04), 0 10px 30px hsl(0 0% 0% / 0.4);
+}
+.cigs-elev-2 {
+    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.06), 0 18px 50px hsl(0 0% 0% / 0.5);
+}
+
+/* Thin desktop scrollbars. */
+.cigs-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.cigs-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.cigs-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cigs-pulse { animation: none !important; }
+}
