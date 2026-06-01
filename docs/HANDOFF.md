@@ -38,9 +38,24 @@ implemented yet (previous session was interrupted right at the start). Locked de
 
 Build order, the recurring green→state reclassification table, the HUD spec, per-screen changes,
 copy guidelines, and the verification checklist are all in that file. **Keep every existing
-`data-testid`** — they are the E2E contract. Verify with `npm run build` + an `npx tauri dev`
-window walk (green only on success; running=magenta; actions=violet; motion smooth incl. macOS
-Reduce-Motion).
+`data-testid`** — they are the E2E contract.
+
+### First moves (in order)
+1. `git pull feat/native-shell`; read `docs/DESIGN_OVERHAUL.md` fully.
+2. **Foundation first:** rewrite tokens in `frontend/src/index.css` → update `tailwind.config.js`
+   (colors/fonts/gradients/keyframes) → swap fonts in `frontend/index.html`. Run `npm run build`
+   to confirm the base compiles *before* touching components.
+3. Reclassification sweep (the green→state table) across shared components + screens.
+4. Build new `components/Hud/` + rebuild `MainScreen.js` **last** (the biggest piece).
+5. `npm run build` + `npx tauri dev` walk → then rebuild the pinned app (snippet below).
+
+### Definition of done ("gold")
+- Green appears ONLY on success/ready/complete; running = magenta; primary actions = violet.
+- Calm type: near-white key text, soft secondary, bold only on action/active/brand.
+- The radial HUD reads as the centerpiece and stays buttery (no jank) with a job running AND
+  with macOS Reduce-Motion on.
+- Every screen/panel self-explains in one sharp line; nothing patronizing.
+- `npm run build` passes; all `data-testid`s intact.
 
 ## State of the tree
 - **Pushed & committed** on `feat/native-shell`:
