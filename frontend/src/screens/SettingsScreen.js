@@ -14,14 +14,13 @@ import {
   NAMING_STYLES,
   TRANSCRIPT_FORMATS,
   AUDIO_FORMATS,
-  OVERWRITE_MODES,
   LOCAL_TOOLS,
   QUALITIES,
 } from "@/data/seed";
-import { FolderOpen, HardDrive, FileCog, Cpu, Palette, Sun, Moon, CheckCircle2, ArrowUpCircle } from "lucide-react";
+import { HardDrive, FileCog, Cpu, CheckCircle2, ArrowUpCircle } from "lucide-react";
 
 export default function SettingsScreen() {
-  const { settings, updateSetting, theme, setTheme } = useCigs();
+  const { settings, updateSetting } = useCigs();
 
   return (
     <div className="cigs-scroll h-full overflow-y-auto">
@@ -32,8 +31,8 @@ export default function SettingsScreen() {
         </div>
 
         <div className="space-y-5">
-          {/* Output */}
-          <Section icon={HardDrive} title="Output">
+          {/* Smart Delivery */}
+          <Section icon={HardDrive} title="Smart delivery">
             <Row label="Output location" hint="Where packaged results would be written">
               <Input
                 data-testid="settings-output-location"
@@ -45,11 +44,8 @@ export default function SettingsScreen() {
             <Row label="File naming style" hint="Template for generated filenames">
               <Picker testid="settings-naming-style" value={settings.namingStyle} options={NAMING_STYLES} onChange={(v) => updateSetting("namingStyle", v)} mono />
             </Row>
-            <Row label="Auto ZIP results" hint="Package every job into a single archive">
+            <Row label="Smart packaging" hint="Auto-ZIP, safe naming, never overwrites">
               <Switch data-testid="settings-auto-zip" checked={settings.autoZip} onCheckedChange={(v) => updateSetting("autoZip", v)} />
-            </Row>
-            <Row label="Overwrite behavior" hint="When an output already exists">
-              <Picker testid="settings-overwrite" value={settings.overwrite} options={OVERWRITE_MODES} onChange={(v) => updateSetting("overwrite", v)} />
             </Row>
           </Section>
 
@@ -89,15 +85,6 @@ export default function SettingsScreen() {
             </div>
           </Section>
 
-          {/* Appearance */}
-          <Section icon={Palette} title="Appearance">
-            <Row label="Theme mode" hint="Switches the entire interface">
-              <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-1">
-                <ThemeBtn active={theme === "dark"} onClick={() => setTheme("dark")} icon={Moon} label="Dark" testid="settings-theme-dark" />
-                <ThemeBtn active={theme === "light"} onClick={() => setTheme("light")} icon={Sun} label="Light" testid="settings-theme-light" />
-              </div>
-            </Row>
-          </Section>
         </div>
       </div>
     </div>
@@ -135,17 +122,4 @@ const Picker = ({ value, options, onChange, mono, testid }) => (
       ))}
     </SelectContent>
   </Select>
-);
-
-const ThemeBtn = ({ active, onClick, icon: Icon, label, testid }) => (
-  <button
-    data-testid={testid}
-    onClick={onClick}
-    className={cn(
-      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-      active ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-    )}
-  >
-    <Icon className="h-3.5 w-3.5" /> {label}
-  </button>
 );

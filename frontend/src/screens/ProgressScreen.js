@@ -4,7 +4,7 @@ import { useCigs } from "@/context/CigsContext";
 import { StageRail } from "@/components/shared/StageRail";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { Button } from "@/components/ui/button";
-import { STAGES, fmtAgo, truncate } from "@/data/seed";
+import { STAGES, truncate } from "@/data/seed";
 import { Activity, X, PackageCheck, Link2, FileAudio, ArrowRight } from "lucide-react";
 
 export default function ProgressScreen() {
@@ -44,11 +44,10 @@ export default function ProgressScreen() {
         </div>
 
         {/* meta strip */}
-        <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border">
           <Meta k="Branch" v={job.branch} />
           <Meta k="Target" v={job.target} />
           <Meta k="Quality" v={job.quality} />
-          <Meta k="Started" v={fmtAgo(job.createdAt)} />
         </div>
 
         {/* pipeline */}
