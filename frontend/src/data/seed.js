@@ -164,15 +164,6 @@ export const DEFAULT_SETTINGS = {
 export const NAMING_STYLES = ["{title}", "{title}-{quality}", "{date}_{title}", "{title}_{target}"];
 export const TRANSCRIPT_FORMATS = ["SRT", "VTT", "TXT", "JSON"];
 export const AUDIO_FORMATS = ["WAV", "FLAC", "M4A", "MP3"];
-export const OVERWRITE_MODES = ["Skip existing", "Overwrite", "Keep both (suffix)"];
-export const PACKAGE_FORMATS = ["ZIP", "Folder", "ZIP + Folder"];
-export const OUTPUT_TYPES = ALL_TARGETS.map((t) => t.key);
-
-export const EXPERIMENTAL = [
-  { key: "expGpuAccel", label: "GPU acceleration", hint: "Offload separation to Metal where available" },
-  { key: "expDiarization", label: "Speaker diarization", hint: "Label distinct speakers in transcripts" },
-  { key: "expLosslessStems", label: "Lossless stems", hint: "Emit 24-bit stems instead of 16-bit" },
-];
 
 export const LOCAL_TOOLS = [
   { name: "yt-dlp", version: "2024.08.06", status: "ready" },
