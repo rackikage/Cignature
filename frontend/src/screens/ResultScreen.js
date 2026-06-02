@@ -44,6 +44,8 @@ export default function ResultScreen() {
   const failed = job.state === "failed";
   const SourceIcon = job.sourceType === "url" ? Link2 : FileAudio;
   const outputs = job.outputs || [];
+  const savedPath = outputs.find((o) => o.path)?.path || null;
+  const savedDir = savedPath ? savedPath.replace(/\/[^/]*$/, "") : null;
 
   return (
     <div className="cigs-scroll h-full overflow-y-auto">
@@ -93,6 +95,13 @@ export default function ResultScreen() {
                   <FolderTree className="h-3.5 w-3.5" /> Output summary
                 </span>
               </div>
+              {savedDir && (
+                <div className="border-b border-border px-3 py-2">
+                  <span data-testid="result-saved-path" className="mono text-[11px] text-muted-foreground">
+                    Saved to {savedDir}
+                  </span>
+                </div>
+              )}
               <ul data-testid="result-output-list" className="divide-y divide-border">
                 {outputs.map((o, i) => {
                   const Icon = KIND_ICON[o.kind] || FileText;

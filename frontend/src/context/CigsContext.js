@@ -363,16 +363,24 @@ export const CigsProvider = ({ children }) => {
 
   const cancelJob = useCallback(
     (id) => {
+      const j = jobs.find((x) => x.id === id);
       setJobs((prev) =>
-        prev.map((j) =>
-          j.id === id
-            ? { ...j, state: "failed", error: "Cancelled by user", failedAt: Date.now() }
-            : j
+        prev.map((x) =>
+          x.id === id
+            ? { ...x, state: "failed", error: "Cancelled by user", failedAt: Date.now() }
+            : x
         )
       );
-      const j = jobs.find((x) => x.id === id);
-      addLog("warn", `Would cancel "${j?.title}"`, id);
-      toast(`Would cancel "${truncate(j?.title || "job", 28)}"`);
+      if (IS_TAURI) {
+        // Real kill: SIGTERM the child + clean its temp dir. The job://failed
+        // event will also land, but the optimistic state above keeps the UI snappy.
+        invoke("cancel_job", { jobId: id }).catch(() => {});
+        addLog("warn", `Cancelling "${j?.title}"`, id);
+        toast(`Cancelling "${truncate(j?.title || "job", 28)}"`);
+      } else {
+        addLog("warn", `Would cancel "${j?.title}"`, id);
+        toast(`Would cancel "${truncate(j?.title || "job", 28)}"`);
+      }
     },
     [jobs, addLog]
   );
