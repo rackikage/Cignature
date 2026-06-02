@@ -63,7 +63,7 @@ export default function ProgressScreen() {
 
           <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className={cn("h-full rounded-full transition-[width] duration-500", isFailed ? "bg-destructive" : "bg-primary")}
+              className={cn("h-full rounded-full transition-[width] duration-500", isFailed ? "bg-destructive" : isDone ? "bg-success" : "bg-live")}
               style={{ width: `${isPending ? 0 : job.progress}%` }}
             />
           </div>
@@ -74,10 +74,10 @@ export default function ProgressScreen() {
           <div className="mt-6 rounded-lg border border-border bg-background p-4">
             {isRunning && (
               <div className="flex items-center gap-3">
-                <span className="h-2 w-2 rounded-full bg-primary cigs-pulse" />
+                <span className="h-2 w-2 rounded-full bg-live cigs-pulse" />
                 <div>
                   <div className="text-sm font-medium text-foreground">{STAGES[activeIndex]?.label}</div>
-                  <div className="mono text-[11px] text-muted-foreground">Would run local pipeline · stage {activeIndex + 1} of {STAGES.length}</div>
+                  <div className="mono text-[11px] text-muted-foreground">Simulated pipeline — timings are mocked · stage {activeIndex + 1} of {STAGES.length}</div>
                 </div>
               </div>
             )}
@@ -87,7 +87,7 @@ export default function ProgressScreen() {
             {isDone && (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <PackageCheck className="h-5 w-5 text-primary" />
+                  <PackageCheck className="h-5 w-5 text-success" />
                   <div className="text-sm font-medium text-foreground">Pipeline complete — outputs ready</div>
                 </div>
                 <Button data-testid="progress-view-result-button" size="sm" className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => navigate("result", job.id)}>

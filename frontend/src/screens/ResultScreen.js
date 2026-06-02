@@ -62,7 +62,7 @@ export default function ResultScreen() {
         {/* summary card */}
         <div className={cn("rounded-xl border bg-card p-5", failed ? "border-destructive/40" : "border-border")}>
           <div className="flex items-center gap-3 border-b border-border pb-4">
-            <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", failed ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>
               {failed ? <AlertTriangle className="h-5 w-5" /> : <PackageCheck className="h-5 w-5" />}
             </div>
             <div>

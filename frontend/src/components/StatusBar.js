@@ -16,8 +16,8 @@ export const StatusBar = () => {
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-void px-3 text-[11px] text-muted-foreground select-none">
       <div className="flex items-center gap-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-warning" style={{ background: "hsl(var(--warning))" }} />
-        <span data-testid="demo-mode-hint">Demo mode — no real processing. Actions are simulated.</span>
+        <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+        <span data-testid="demo-mode-hint">Preview build — jobs are simulated, nothing on disk is touched.</span>
       </div>
 
       <div className="flex items-center gap-4">

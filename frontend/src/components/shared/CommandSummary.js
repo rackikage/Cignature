@@ -31,7 +31,7 @@ export const CommandSummary = () => {
       data-testid="command-summary"
       className="flex items-center gap-2 overflow-hidden rounded-lg border border-border bg-card px-3 py-2"
     >
-      <Terminal className={cn("h-3.5 w-3.5 shrink-0", complete ? "text-primary" : "text-muted-foreground")} />
+      <Terminal className={cn("h-3.5 w-3.5 shrink-0", complete ? "text-success" : "text-muted-foreground")} />
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
         {steps.map((s, i) => (
           <React.Fragment key={i}>
@@ -47,7 +47,7 @@ export const CommandSummary = () => {
           </React.Fragment>
         ))}
         <span className="mx-1 text-border">—</span>
-        <span className={cn("text-[12px]", complete ? "text-primary" : "text-muted-foreground")}>
+        <span className={cn("text-[12px]", complete ? "text-success" : "text-muted-foreground")}>
           {outcome}
         </span>
       </div>

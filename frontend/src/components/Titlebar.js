@@ -29,10 +29,10 @@ export const Titlebar = () => {
         <div className="flex items-center gap-2 pl-0.5">
           <span className="h-3 w-3 rounded-full bg-destructive/80" />
           <span className="h-3 w-3 rounded-full" style={{ background: "hsl(var(--warning))" }} />
-          <span className="h-3 w-3 rounded-full bg-primary/80" />
+          <span className="h-3 w-3 rounded-full bg-success/80" />
         </div>
         <div className="flex items-baseline gap-2 pl-2">
-          <span className="text-[13px] font-bold tracking-tight text-foreground">Cigs</span>
+          <span className="bg-grad-primary bg-clip-text text-[13px] font-bold tracking-tight text-transparent">Cigs</span>
           <span className="text-[11px] text-muted-foreground">— local media utility</span>
         </div>
         <span className="text-border">/</span>
@@ -49,14 +49,14 @@ export const Titlebar = () => {
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
           running
-            ? "border-primary/40 bg-primary/10 text-primary"
+            ? "border-live/40 bg-live/10 text-live"
             : "border-border bg-muted text-muted-foreground"
         )}
       >
         <span
           className={cn(
             "h-1.5 w-1.5 rounded-full",
-            running ? "bg-primary cigs-pulse" : "bg-muted-foreground"
+            running ? "bg-live cigs-pulse" : "bg-muted-foreground"
           )}
         />
         {statusLabel}

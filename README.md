@@ -13,29 +13,28 @@ Cigs is a local Mac media utility UI — a frontend-only demo of the job pipelin
 
 ## Stack
 
-- React 19 + react-scripts 5 (via craco)
+- React 19 + Vite 6
+- Tauri 2 native shell (macOS, dark-only) — backend is still **simulated** (no real engine yet)
 - Tailwind CSS 3 + shadcn/ui (Radix primitives)
 - Framer Motion (subtle layout transitions only)
 - Sonner (toasts)
-- **Node 18 required** — react-scripts 5 is incompatible with Node 19+
+- Runs on any modern Node — no version pin needed
 
 ---
 
 ## Start dev server
 
+Browser (Vite only):
 ```bash
 cd Cignature
 ./dev.sh
 ```
 
-`dev.sh` handles Node 18 switching automatically via nvm. Open `http://localhost:3000`.
+`dev.sh` runs `npm run dev` (Vite). Open `http://localhost:3000`.
 
-Or manually:
+Native window (Tauri shell around the Vite app):
 ```bash
-export NVM_DIR="$HOME/.nvm"
-source "$(brew --prefix nvm)/nvm.sh"
-nvm use 18
-cd frontend && npx craco start
+cd frontend && npx tauri dev
 ```
 
 ---
@@ -45,12 +44,15 @@ cd frontend && npx craco start
 ```
 Cignature/
   frontend/
+    index.html                Vite entry (root)
+    vite.config.mjs           Vite config (JSX-in-.js loader, "@" → src alias)
+    src-tauri/                Tauri 2 native shell (Rust) — window, bundle, icons
     src/
       App.js                  shell layout (sidebar + main + inspector + statusbar)
       context/CigsContext.js  all state, actions, seeded jobs
       data/seed.js            static data + pure helpers (no side effects)
       screens/                one file per nav destination
-        MainScreen.js         job builder (source → hub → target → quality → confirm)
+        MainScreen.js         job builder (source → HUD → target → quality → confirm)
         QueueScreen.js        all jobs grouped by state
         ProgressScreen.js     live pipeline view for selected/running job
         ResultScreen.js       outputs or error for completed/failed job
@@ -61,10 +63,10 @@ Cignature/
         Titlebar.js           mac traffic lights (cosmetic) + screen title + status pill
         StatusBar.js          demo mode disclosure + job count + keyboard hints
         Inspector.js          context-aware right panel (changes per screen)
-        CircularHub.js        branch selector (Audio / Complete / Video)
+        Hud/                  radial command HUD (branch selector + live core)
         shared/               JobCard, StageRail, StatusPill, CommandSummary
       index.css               design tokens (dark-only palette, utilities, motion)
-  dev.sh                      one-command dev server (Node 18 safe)
+  dev.sh                      one-command dev server (Vite)
 ```
 
 ---

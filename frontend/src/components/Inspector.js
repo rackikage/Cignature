@@ -145,11 +145,11 @@ const JobDetail = ({ job, onOpen }) => (
     {job.state === "running" && (
       <div className="mt-3">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-primary">{STAGES[job.stageIndex]?.label}</span>
+          <span className="text-live">{STAGES[job.stageIndex]?.label}</span>
           <span className="tabular text-foreground">{Math.round(job.progress)}%</span>
         </div>
         <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${job.progress}%` }} />
+          <div className="h-full rounded-full bg-live transition-[width] duration-500" style={{ width: `${job.progress}%` }} />
         </div>
       </div>
     )}
@@ -278,7 +278,7 @@ const SettingsInspector = () => {
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Would write</div>
           <div className="mono mt-1 break-all text-[12px] text-foreground">
-            {settings.outputLocation}/<span className="text-primary">{file}</span>
+            {settings.outputLocation}/<span className="text-info">{file}</span>
           </div>
         </div>
       </Section>

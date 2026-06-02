@@ -4,7 +4,7 @@
 
 :root {
     --font-ui: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 body {
@@ -25,30 +25,49 @@ code,
        component (e.g. sonner) that keys off the class. */
     :root,
     .dark {
-        --background: 220 24% 5%;
-        --foreground: 220 60% 96%;
-        --card: 222 26% 7.5%;
-        --card-foreground: 220 60% 96%;
-        --popover: 222 26% 8%;
-        --popover-foreground: 220 60% 96%;
-        --primary: 145 100% 62%;
-        --primary-foreground: 220 30% 6%;
-        --secondary: 222 22% 12%;
-        --secondary-foreground: 220 60% 96%;
-        --muted: 222 18% 12%;
-        --muted-foreground: 220 12% 66%;
-        --accent: 258 100% 70%;
-        --accent-foreground: 220 60% 98%;
-        --destructive: 342 100% 62%;
-        --destructive-foreground: 220 60% 98%;
-        --warning: 38 100% 58%;
-        --info: 218 100% 72%;
-        --border: 220 20% 15%;
-        --input: 220 20% 15%;
-        --ring: 145 100% 62%;
-        --radius: 0.625rem;
-        --void: 222 32% 3%;
-        --surface-2: 222 24% 10%;
+        --void: 231 30% 4%;
+        --background: 231 26% 6%;
+        --card: 231 22% 9%;
+        --card-foreground: 233 28% 97%;
+        --popover: 231 24% 10%;
+        --popover-foreground: 233 28% 97%;
+        --secondary: 231 18% 14%;
+        --secondary-foreground: 233 28% 97%;
+        --muted: 231 16% 14%;
+        --muted-foreground: 233 16% 67%;
+        --surface-2: 231 18% 12%;
+        --border: 231 14% 22%;
+        --input: 231 14% 18%;
+        --foreground: 233 28% 97%;
+
+        /* Accent system — violet lead; the rest is a state code. */
+        --primary: 259 89% 75%;
+        --primary-foreground: 231 40% 8%;
+        --ring: 259 89% 75%;
+        --accent: 259 38% 22%;
+        --accent-foreground: 233 28% 97%;
+        --success: 141 70% 58%;
+        --success-foreground: 231 40% 8%;
+        --info: 190 92% 72%;
+        --live: 327 95% 73%;
+        --live-foreground: 231 40% 8%;
+        --warning: 31 100% 71%;
+        --warning-foreground: 231 40% 8%;
+        --destructive: 0 100% 69%;
+        --destructive-foreground: 233 28% 97%;
+
+        /* Data-viz ramp */
+        --chart-1: 259 89% 75%;
+        --chart-2: 190 92% 72%;
+        --chart-3: 141 70% 58%;
+        --chart-4: 327 95% 73%;
+        --chart-5: 31 100% 71%;
+
+        --radius: 0.75rem;
+
+        /* Gradients — used sparingly (primary CTA, hub ring, wordmark). */
+        --grad-primary: linear-gradient(135deg, hsl(259 89% 72%), hsl(327 95% 70%));
+        --grad-hub: conic-gradient(from 0deg, hsl(259 89% 70% / 0), hsl(259 89% 70% / .9), hsl(327 95% 70% / .9), hsl(190 92% 72% / .9), hsl(259 89% 70% / 0));
     }
 }
 
@@ -119,10 +138,10 @@ code,
 
 /* Elevation — crisp 1px top highlight + soft drop. No glass, no glow. */
 .cigs-elev-1 {
-    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04), 0 10px 30px hsl(0 0% 0% / 0.4);
+    box-shadow: 0 1px 0 hsl(259 89% 75% / 0.05), 0 10px 30px hsl(0 0% 0% / 0.4);
 }
 .cigs-elev-2 {
-    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.06), 0 18px 50px hsl(0 0% 0% / 0.5);
+    box-shadow: 0 1px 0 hsl(259 89% 75% / 0.07), 0 18px 50px hsl(0 0% 0% / 0.5);
 }
 
 /* Thin desktop scrollbars. */
@@ -134,11 +153,12 @@ code,
     background-clip: padding-box;
 }
 .cigs-scroll::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: hsl(var(--primary) / 0.5);
     background-clip: padding-box;
     border: 2px solid transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .cigs-pulse { animation: none !important; }
+    .animate-hub-drift { animation: none !important; }
 }

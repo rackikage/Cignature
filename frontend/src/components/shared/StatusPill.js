@@ -4,14 +4,14 @@ import { cn } from "@/lib/utils";
 const MAP = {
   running: {
     label: "Running",
-    cls: "border-primary/40 text-primary bg-primary/10",
-    dot: "bg-primary",
+    cls: "border-live/40 text-live bg-live/10",
+    dot: "bg-live",
     pulse: true,
   },
   completed: {
     label: "Completed",
-    cls: "border-primary/25 text-primary bg-primary/[0.07]",
-    dot: "bg-primary",
+    cls: "border-success/30 text-success bg-success/10",
+    dot: "bg-success",
   },
   pending: {
     label: "Pending",

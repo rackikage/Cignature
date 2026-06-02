@@ -19,12 +19,12 @@ export const StageRail = ({ activeIndex = 0, failed = false, className, compact 
         return (
           <div key={s.key} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
-              <div className={cn("h-px flex-1", i === 0 ? "opacity-0" : isDone || isActive ? "bg-primary/50" : "bg-border")} />
+              <div className={cn("h-px flex-1", i === 0 ? "opacity-0" : isDone ? "bg-success/45" : isActive ? "bg-primary/50" : "bg-border")} />
               <div
                 data-testid={isActive ? "progress-active-stage" : undefined}
                 className={cn(
                   "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors",
-                  isDone && "border-primary/50 bg-primary/15 text-primary",
+                  isDone && "border-success/50 bg-success/15 text-success",
                   isActive && "border-primary bg-primary/15 text-primary cigs-elev-1",
                   isFailed && "border-destructive bg-destructive/15 text-destructive",
                   isUpcoming && "border-border bg-muted text-muted-foreground"
@@ -38,7 +38,7 @@ export const StageRail = ({ activeIndex = 0, failed = false, className, compact 
                   <Icon className={cn("h-4 w-4", isActive && "cigs-pulse")} />
                 )}
               </div>
-              <div className={cn("h-px flex-1", i === STAGES.length - 1 ? "opacity-0" : isDone || isActive ? "bg-primary/50" : "bg-border")} />
+              <div className={cn("h-px flex-1", i === STAGES.length - 1 ? "opacity-0" : isDone ? "bg-success/45" : isActive ? "bg-primary/50" : "bg-border")} />
             </div>
             {!compact && (
               <span
