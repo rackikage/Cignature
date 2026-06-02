@@ -3,13 +3,10 @@ import { cn } from "@/lib/utils";
 import { useCigs } from "@/context/CigsContext";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { fmtAgo, truncate } from "@/data/seed";
 import {
   PackageCheck,
-  Download,
   FolderOpen,
-  Copy,
   FolderTree,
   FileText,
   Music2,
@@ -31,7 +28,7 @@ const KIND_ICON = {
 };
 
 export default function ResultScreen() {
-  const { jobs, selectedJobId, navigate, retryJob } = useCigs();
+  const { jobs, selectedJobId, navigate, retryJob, revealOutput } = useCigs();
 
   const job =
     jobs.find((j) => j.id === selectedJobId && (j.state === "completed" || j.state === "failed")) ||
@@ -105,8 +102,18 @@ export default function ResultScreen() {
               <ul data-testid="result-output-list" className="divide-y divide-border">
                 {outputs.map((o, i) => {
                   const Icon = KIND_ICON[o.kind] || FileText;
+                  const revealable = !!o.path;
                   return (
-                    <li key={i} className="flex items-center justify-between px-3 py-2.5">
+                    <li
+                      key={i}
+                      data-testid={revealable ? "result-output-row-revealable" : undefined}
+                      onClick={revealable ? () => revealOutput(o.path) : undefined}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2.5",
+                        revealable && "cursor-pointer transition-colors hover:bg-surface-2"
+                      )}
+                      title={revealable ? "Reveal in Finder" : undefined}
+                    >
                       <div className="flex min-w-0 items-center gap-2.5">
                         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span className="mono truncate text-[12px] text-foreground">{o.name}</span>
@@ -124,26 +131,17 @@ export default function ResultScreen() {
         <div className="mt-4 flex flex-wrap gap-2">
           {failed ? (
             <Button data-testid="result-retry-button" className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => retryJob(job.id)}>
-              <RotateCcw className="h-4 w-4" /> Retry job
+              <RotateCcw className="h-4 w-4" /> Retry
             </Button>
-          ) : (
-            <>
-              <Button data-testid="result-download-zip-button" className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => toast.success("Would package results into a single ZIP")}>
-                <Download className="h-4 w-4" /> Download ZIP
-              </Button>
-              <Button data-testid="result-reveal-finder-button" variant="outline" className="gap-2" onClick={() => toast("Would reveal packaged output in Finder")}>
-                <FolderOpen className="h-4 w-4" /> Reveal in Finder
-              </Button>
-              <Button data-testid="result-open-folder-button" variant="outline" className="gap-2" onClick={() => toast("Would open the output folder")}>
-                <FolderTree className="h-4 w-4" /> Open folder
-              </Button>
-              {job.target?.includes("Transcript") && (
-                <Button data-testid="result-copy-transcript-button" variant="outline" className="gap-2" onClick={() => toast.success("Would copy transcript to clipboard")}>
-                  <Copy className="h-4 w-4" /> Copy transcript
-                </Button>
-              )}
-            </>
-          )}
+          ) : savedPath ? (
+            <Button
+              data-testid="result-reveal-finder-button"
+              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => revealOutput(savedPath)}
+            >
+              <FolderOpen className="h-4 w-4" /> Reveal in Finder
+            </Button>
+          ) : null}
           <Button variant="ghost" className="gap-2 text-muted-foreground" onClick={() => navigate("logs", job.id)}>
             View logs
           </Button>

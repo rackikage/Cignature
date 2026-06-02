@@ -1,8 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useCigs } from "@/context/CigsContext";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -11,7 +9,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  NAMING_STYLES,
   TRANSCRIPT_FORMATS,
   AUDIO_FORMATS,
   LOCAL_TOOLS,
@@ -27,26 +24,18 @@ export default function SettingsScreen() {
       <div className="mx-auto max-w-[860px] p-6">
         <div className="mb-5">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Preferences for the local pipeline — applied when the engine lands.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Processing defaults. Outputs are automatic.</p>
         </div>
 
         <div className="space-y-5">
-          {/* Smart Delivery */}
-          <Section icon={HardDrive} title="Smart delivery">
-            <Row label="Output location" hint="Where packaged results would be written">
-              <Input
-                data-testid="settings-output-location"
-                value={settings.outputLocation}
-                onChange={(e) => updateSetting("outputLocation", e.target.value)}
-                className="mono h-9 w-[260px] bg-background text-xs"
-              />
-            </Row>
-            <Row label="File naming style" hint="Template for generated filenames">
-              <Picker testid="settings-naming-style" value={settings.namingStyle} options={NAMING_STYLES} onChange={(v) => updateSetting("namingStyle", v)} mono />
-            </Row>
-            <Row label="Smart packaging" hint="Auto-ZIP, safe naming, never overwrites">
-              <Switch data-testid="settings-auto-zip" checked={settings.autoZip} onCheckedChange={(v) => updateSetting("autoZip", v)} />
-            </Row>
+          {/* Output — informational only. No prompts, no config. */}
+          <Section icon={HardDrive} title="Output">
+            <div className="px-4 py-3.5 text-sm">
+              <div className="text-foreground">Files land on your Desktop.</div>
+              <div className="mt-1 text-[12px] text-muted-foreground">
+                Single result → saved raw. Multiple results → bundled into a zip named after the source.
+              </div>
+            </div>
           </Section>
 
           {/* Processing */}
@@ -54,17 +43,17 @@ export default function SettingsScreen() {
             <Row label="Default quality" hint="Preset selected for new jobs">
               <Picker testid="settings-default-quality" value={settings.defaultQuality} options={QUALITIES.map((q) => q.key)} onChange={(v) => updateSetting("defaultQuality", v)} />
             </Row>
-            <Row label="Transcript format" hint="Output format for speech-to-text">
+            <Row label="Transcript format" hint="Container for speech-to-text output">
               <Picker testid="settings-transcript-format" value={settings.transcriptFormat} options={TRANSCRIPT_FORMATS} onChange={(v) => updateSetting("transcriptFormat", v)} />
             </Row>
-            <Row label="Preferred audio format" hint="Container for extracted audio">
+            <Row label="Audio format" hint="Container for extracted audio">
               <Picker testid="settings-audio-format" value={settings.audioFormat} options={AUDIO_FORMATS} onChange={(v) => updateSetting("audioFormat", v)} />
             </Row>
           </Section>
 
           {/* Local tools */}
-          <Section icon={Cpu} title="Local model / tool status">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Section icon={Cpu} title="Local toolchain">
+            <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
               {LOCAL_TOOLS.map((t) => (
                 <div key={t.name} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2.5">
                   <div>

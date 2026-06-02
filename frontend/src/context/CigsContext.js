@@ -7,8 +7,9 @@ import React, {
   useCallback,
 } from "react";
 import { toast } from "sonner";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   SEED_JOBS,
   SEED_LOGS,
@@ -28,9 +29,21 @@ export const useCigs = () => {
 };
 
 // Running inside the Tauri native shell? In the browser demo this is false and
-// every action stays cosmetic (fake ticker + "would" copy). Under Tauri, jobs
-// are driven by the real Rust engine via invoke("start_job") + job://* events.
-const IS_TAURI = typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
+// every action stays cosmetic. Under Tauri, jobs go through the real Rust
+// engine via invoke("start_job") + job://* events.
+//
+// CRITICAL: this MUST be a runtime call, not a module-load const. In Vite dev
+// the JS modules can evaluate before Tauri's IPC bootstrap script finishes,
+// so a const captures `false` and the app silently runs the demo path inside
+// the native window. Using @tauri-apps/api's official isTauri() defers the
+// check to call time, after the bootstrap has settled.
+const inTauri = () => {
+  try {
+    return isTauri();
+  } catch {
+    return false;
+  }
+};
 
 function sourceTitle(b) {
   if (b.sourceType === "file") return b.fileName || "Local file";
@@ -50,11 +63,13 @@ export const CigsProvider = ({ children }) => {
     document.documentElement.classList.add("dark");
   }, []);
 
+  // Native shell starts clean — no seeded demo jobs/logs cluttering the UI.
+  // Browser preview keeps the seeds so the UI shape is visible without a backend.
   const [screen, setScreen] = useState("main");
-  const [selectedJobId, setSelectedJobId] = useState("job_seed_run");
+  const [selectedJobId, setSelectedJobId] = useState(() => (inTauri() ? null : "job_seed_run"));
   const [selectedLogId, setSelectedLogId] = useState(null);
-  const [jobs, setJobs] = useState(SEED_JOBS);
-  const [logs, setLogs] = useState(SEED_LOGS);
+  const [jobs, setJobs] = useState(() => (inTauri() ? [] : SEED_JOBS));
+  const [logs, setLogs] = useState(() => (inTauri() ? [] : SEED_LOGS));
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [builder, setBuilder] = useState({
     sourceType: "url",
@@ -81,7 +96,7 @@ export const CigsProvider = ({ children }) => {
   // ---- demo progress ticker (visual only, no real work) ----
   // Browser demo only — under Tauri the real engine drives progress via events.
   useEffect(() => {
-    if (IS_TAURI) return;
+    if (inTauri()) return;
     const t = setInterval(() => {
       setJobs((prev) => {
         let changed = false;
@@ -116,7 +131,7 @@ export const CigsProvider = ({ children }) => {
     new Set(SEED_JOBS.filter((j) => j.state === "completed").map((j) => j.id))
   );
   useEffect(() => {
-    if (IS_TAURI) return;
+    if (inTauri()) return;
     jobs.forEach((j) => {
       if (j.state === "completed" && !completedRef.current.has(j.id)) {
         completedRef.current.add(j.id);
@@ -143,7 +158,7 @@ export const CigsProvider = ({ children }) => {
   // misleading "Finished X" after the user just cancelled, and a user-initiated
   // cancel doesn't double-toast ("Cancelling X" + "Job failed — Cancelled").
   useEffect(() => {
-    if (!IS_TAURI) return;
+    if (!inTauri()) return;
     const isTerminal = (s) => s === "completed" || s === "failed";
     const unlisteners = [];
     let disposed = false;
@@ -249,7 +264,6 @@ export const CigsProvider = ({ children }) => {
       target: null,
       quality: settings.defaultQuality,
     });
-    toast("Job path cleared");
   }, [settings.defaultQuality]);
 
   const validateBuilder = useCallback((b) => {
@@ -321,7 +335,7 @@ export const CigsProvider = ({ children }) => {
     setJobs((prev) => [job, ...prev]);
     setSelectedJobId(job.id);
     setScreen("progress");
-    if (IS_TAURI) {
+    if (inTauri()) {
       addLog("info", `Starting ${job.branch} · ${job.target} · ${job.quality}`, job.id);
       engineStart(job);
     } else {
@@ -336,8 +350,8 @@ export const CigsProvider = ({ children }) => {
     if (!validateBuilder(builder)) return;
     const job = makeJob(builder, "pending");
     setJobs((prev) => [...prev, job]);
-    addLog("info", `Queued "${job.title}" — would process locally`, job.id);
-    toast(`Would queue ${job.branch} · ${job.target} for local processing`);
+    addLog("info", `Queued ${job.branch} · ${job.target}`, job.id);
+    toast(`Queued ${job.branch} · ${job.target}`);
     resetBuilder();
   }, [builder, addLog, validateBuilder, resetBuilder]);
 
@@ -354,7 +368,7 @@ export const CigsProvider = ({ children }) => {
       );
       setSelectedJobId(id);
       setScreen("progress");
-      if (IS_TAURI && j) {
+      if (inTauri() && j) {
         addLog("info", `Starting "${j.title}"`, id);
         engineStart(j);
       } else {
@@ -377,7 +391,7 @@ export const CigsProvider = ({ children }) => {
       );
       setSelectedJobId(id);
       setScreen("progress");
-      if (IS_TAURI && j) {
+      if (inTauri() && j) {
         addLog("info", `Retrying "${j.title}"`, id);
         engineStart(j);
       } else {
@@ -387,6 +401,21 @@ export const CigsProvider = ({ children }) => {
     },
     [jobs, addLog, engineStart]
   );
+
+  // Open Finder at the output's directory, with the file selected.
+  // Browser preview can only acknowledge — no FS access.
+  const revealOutput = useCallback(async (path) => {
+    if (!path) return;
+    if (inTauri()) {
+      try {
+        await revealItemInDir(path);
+      } catch (e) {
+        toast.error(`Could not reveal: ${truncate(String(e), 42)}`);
+      }
+    } else {
+      toast(`Would reveal "${truncate(path, 36)}" in Finder`);
+    }
+  }, []);
 
   const cancelJob = useCallback(
     (id) => {
@@ -398,12 +427,12 @@ export const CigsProvider = ({ children }) => {
             : x
         )
       );
-      if (IS_TAURI) {
+      if (inTauri()) {
         // Real kill: SIGTERM the child + clean its temp dir. The job://failed
         // event will also land, but the optimistic state above keeps the UI snappy.
         invoke("cancel_job", { jobId: id }).catch(() => {});
-        addLog("warn", `Cancelling "${j?.title}"`, id);
-        toast(`Cancelling "${truncate(j?.title || "job", 28)}"`);
+        addLog("warn", `Cancelled "${j?.title}"`, id);
+        toast(`Cancelled "${truncate(j?.title || "job", 28)}"`);
       } else {
         addLog("warn", `Would cancel "${j?.title}"`, id);
         toast(`Would cancel "${truncate(j?.title || "job", 28)}"`);
@@ -415,59 +444,51 @@ export const CigsProvider = ({ children }) => {
   const pauseJob = useCallback(
     (id) => {
       const j = jobs.find((x) => x.id === id);
-      addLog("info", `Would pause "${j?.title}"`, id);
-      toast(`Would pause "${truncate(j?.title || "job", 28)}"`);
+      // Pause isn't implementable mid-subprocess without engine support; cancel/retry
+      // is the live path. Keep the action wired but honest about scope.
+      addLog("info", `Pause not yet supported — use cancel for "${j?.title}"`, id);
+      toast("Pause isn't supported yet — cancel and retry instead");
     },
     [jobs, addLog]
   );
 
   const removeJob = useCallback(
     (id) => {
-      const j = jobs.find((x) => x.id === id);
       setJobs((prev) => prev.filter((x) => x.id !== id));
-      toast(`Would remove "${truncate(j?.title || "job", 28)}" from queue`);
     },
-    [jobs]
+    []
   );
 
   const clearCompleted = useCallback(() => {
     const count = jobs.filter((j) => j.state === "completed").length;
     if (!count) {
-      toast("No completed jobs to clear");
+      toast("Nothing to clear");
       return;
     }
     setJobs((prev) => prev.filter((j) => j.state !== "completed"));
-    toast(`Would clear ${count} completed job${count > 1 ? "s" : ""}`);
+    toast(`Cleared ${count} completed job${count > 1 ? "s" : ""}`);
   }, [jobs]);
 
   const reorderHint = useCallback(() => {
-    toast("Would reorder the queue");
+    toast("Queue reordering isn't supported yet");
   }, []);
 
   // ---- settings ----
+  // Output behavior is auto (Desktop · raw single / zip multi) and isn't exposed.
+  // Only the processing-default knobs surface in SettingsScreen.
   const updateSetting = useCallback((key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     const labels = {
-      outputLocation: "Output location",
-      namingStyle: "File naming style",
-      overwrite: "Overwrite behavior",
-      packageFormat: "Package format",
-      includeManifest: "Manifest in package",
-      autoZip: "Auto-package results",
       defaultQuality: "Default quality",
-      defaultOutputType: "Default output type",
       transcriptFormat: "Transcript format",
-      audioFormat: "Preferred audio format",
-      confirmDestructive: "Confirm destructive actions",
-      expGpuAccel: "GPU acceleration (experimental)",
-      expDiarization: "Speaker diarization (experimental)",
-      expLosslessStems: "Lossless stems (experimental)",
+      audioFormat: "Audio format",
     };
-    const label = labels[key] || key;
+    const label = labels[key];
+    if (!label) return;
     if (typeof value === "boolean") {
-      toast(`${label} ${value ? "enabled" : "disabled"}`);
+      toast(`${label} ${value ? "on" : "off"}`);
     } else {
-      toast(`${label} set to ${value}`);
+      toast(`${label} · ${value}`);
     }
   }, []);
 
@@ -503,6 +524,7 @@ export const CigsProvider = ({ children }) => {
     removeJob,
     clearCompleted,
     reorderHint,
+    revealOutput,
   };
 
   return <CigsContext.Provider value={value}>{children}</CigsContext.Provider>;

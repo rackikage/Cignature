@@ -1,19 +1,25 @@
-//! Cigs engine — the UI⇄Rust seam (Phase 3) + the first real pipeline (Phase 4).
+//! Cigs engine — the UI⇄Rust seam + the real pipelines.
 //!
 //! The frontend issues `start_job` and the engine drives a real job through a
 //! state machine, emitting events keyed by a durable `jobId`. The stage model
 //! mirrors `STAGES` in `frontend/src/data/seed.js` — keep the two in sync.
 //!
 //! REAL today:
-//!   * the command/event plumbing + per-job cancel registry (watch channel)
-//!   * `resolve` — a real `yt-dlp` metadata probe (title/duration)
-//!   * **Original / Song** — a real pipeline: `yt-dlp` download (streamed
-//!     progress) → `ffmpeg` remux/transcode (streamed progress) → file written
-//!     to the Desktop. Cancel sends SIGTERM to the child and cleans the temp dir.
+//!   * Command / event plumbing + per-job cancel registry (watch channel).
+//!   * `resolve` — real `yt-dlp` metadata probe (title/duration), cancellable
+//!     with a 30s timeout.
+//!   * **Original / Song** — yt-dlp download → ffmpeg remux/transcode → file on
+//!     the Desktop. Cancel SIGTERMs the child and cleans the temp dir.
+//!   * **Instrumental** — yt-dlp bestaudio → ffmpeg center-channel cancel
+//!     filter → `.instrumental.m4a` on the Desktop. Best-effort on mid/side
+//!     mixed material; real stem separation lands when demucs ships.
+//!   * Output rule: **single file → raw on Desktop · multi file → zip on
+//!     Desktop named after the real title**. No prompts, no config.
+//!   * Native feel: OS window title transitions per state · system
+//!     notification on done.
 //!
-//! STILL SIMULATED (honest logs say so): Transcript / Stems / Vocals /
-//! Instrumental — they walk the same spine and Phase 5 swaps in
-//! `whisper`/`demucs`.
+//! STILL SIMULATED (honest logs say so): Transcript / Stems / Vocals — they
+//! walk the same spine and Phase 5 swaps in whisper / demucs.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -24,6 +30,7 @@ use std::time::Duration;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_notification::NotificationExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::watch;
 
@@ -676,9 +683,174 @@ async fn run_original_song(
     // _guard drops here → temp dir removed
 }
 
+/// REAL Instrumental pipeline: same spine as Original/Song.
+/// yt-dlp downloads bestaudio → ffmpeg applies a stereo center-channel cancel
+/// (subtract mid → emphasize sides) to suppress centred vocals → m4a on Desktop.
+/// Best-effort on classic mid/side mixed material; real stem separation is
+/// Phase 5 (demucs).
+async fn run_instrumental(
+    app: &AppHandle,
+    req: &JobRequest,
+    title: &str,
+    duration: Option<f64>,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Vec<OutputItem>, RunError> {
+    let job_id = &req.job_id;
+
+    let temp = std::env::temp_dir().join(format!("cigs-{job_id}"));
+    std::fs::create_dir_all(&temp).map_err(|e| RunError::Failed(format!("temp dir: {e}")))?;
+    let _guard = TempGuard(temp.clone());
+
+    // ---- stage 1: download bestaudio ----
+    emit_stage(app, job_id, 1);
+    emit_log(app, job_id, "info", "Downloading source audio (yt-dlp)");
+    let out_tpl = temp.join("source.%(ext)s");
+    let mut dl = tokio::process::Command::new(ytdlp_bin());
+    dl.arg("--newline")
+        .arg("--no-playlist")
+        .arg("--no-warnings")
+        .arg("--no-part")
+        .arg("-f")
+        .arg("bestaudio/best")
+        .arg("-o")
+        .arg(&out_tpl)
+        .arg(&req.source);
+
+    let pct_re = Regex::new(r"\[download\]\s+([0-9.]+)%").unwrap();
+    {
+        let app = app.clone();
+        let job_id = job_id.clone();
+        run_with_progress(&mut dl, cancel, move |line| {
+            if let Some(c) = pct_re.captures(line) {
+                if let Ok(pct) = c[1].parse::<f64>() {
+                    emit_progress(&app, &job_id, lerp(DL_START, DL_END, pct / 100.0), 1);
+                }
+            }
+        })
+        .await?;
+    }
+    if *cancel.borrow() {
+        return Err(RunError::Cancelled);
+    }
+    let input =
+        first_file_in(&temp).ok_or_else(|| RunError::Failed("download produced no file".into()))?;
+    emit_progress(app, job_id, DL_END, 1);
+
+    // ---- stage 2: center-channel cancel ----
+    // The pan filter rebuilds L/R from the side signal: c0=c0-c1 leaves only the
+    // L-R difference (vocals usually live centred so they cancel). It's the same
+    // trick karaoke filters use; works on mid/side encoded material, weaker on
+    // post-2010 wide-mix masters. Honest log line says so.
+    emit_stage(app, job_id, 2);
+    let base = sanitize_filename(&output_base(title));
+    let dest_dir = dirs::desktop_dir()
+        .or_else(dirs::home_dir)
+        .ok_or_else(|| RunError::Failed("no Desktop directory".into()))?;
+    let out_path = unique_path(&dest_dir, &format!("{base}.instrumental"), "m4a");
+    emit_log(
+        app,
+        job_id,
+        "info",
+        "Cancelling centre channel (ffmpeg) — best on mid/side mixed material",
+    );
+
+    let mut ff = tokio::process::Command::new(ffmpeg_bin());
+    ff.arg("-y")
+        .arg("-hide_banner")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-nostats")
+        .arg("-i")
+        .arg(&input)
+        .arg("-vn")
+        .arg("-af")
+        .arg("pan=stereo|c0=c0-c1|c1=c1-c0")
+        .arg("-c:a")
+        .arg("aac")
+        .arg("-b:a")
+        .arg("256k")
+        .arg("-movflags")
+        .arg("+faststart")
+        .arg("-progress")
+        .arg("pipe:1")
+        .arg(&out_path);
+
+    let dur = duration.unwrap_or(0.0);
+    {
+        let app = app.clone();
+        let job_id = job_id.clone();
+        run_with_progress(&mut ff, cancel, move |line| {
+            if let Some(v) = line.strip_prefix("out_time=") {
+                if dur > 0.0 {
+                    if let Some(sec) = parse_ffmpeg_time(v.trim()) {
+                        emit_progress(&app, &job_id, lerp(CV_START, CV_END, sec / dur), 2);
+                    }
+                }
+            }
+        })
+        .await?;
+    }
+    if *cancel.borrow() {
+        let _ = std::fs::remove_file(&out_path);
+        return Err(RunError::Cancelled);
+    }
+
+    emit_progress(app, job_id, CV_END, 2);
+    let size = std::fs::metadata(&out_path)
+        .map(|m| human_size(m.len()))
+        .unwrap_or_else(|_| "—".into());
+    let fname = out_path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| format!("{base}.instrumental.m4a"));
+    emit_log(
+        app,
+        job_id,
+        "info",
+        format!("Saved {fname} ({size}) to {}", dest_dir.display()),
+    );
+
+    Ok(vec![OutputItem {
+        name: fname,
+        kind: "audio".into(),
+        size,
+        path: Some(out_path.to_string_lossy().to_string()),
+    }])
+}
+
+/// Set the OS window title — surfaces job state without touching the in-app chrome.
+fn set_window_title(app: &AppHandle, title: &str) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_title(title);
+    }
+}
+
+/// Fire a system notification — used on done. macOS shows it in Notification Centre.
+fn notify_done(app: &AppHandle, job_title: &str, body: &str) {
+    let _ = app
+        .notification()
+        .builder()
+        .title(format!("Cigs — {job_title}"))
+        .body(body)
+        .show();
+}
+
 /// Drive one job through the state machine, emitting events as it goes.
 async fn run_job(app: AppHandle, req: JobRequest, mut cancel: watch::Receiver<bool>) {
     let job_id = req.job_id.clone();
+
+    // P4: surface job state in the macOS title bar / dock.
+    set_window_title(&app, "Cigs — Downloading…");
+
+    // Helper closures to keep the dispatch ribbon clean.
+    let fail = |app: &AppHandle, e: &str| {
+        set_window_title(app, "Cigs — Failed");
+        emit_failed(app, &job_id, e);
+    };
+    let cancelled = |app: &AppHandle| {
+        set_window_title(app, "Cigs");
+        emit_failed(app, &job_id, "Cancelled");
+    };
 
     // ---- stage 0: resolve (REAL metadata probe for URL sources) ----
     emit_stage(&app, &job_id, 0);
@@ -707,36 +879,70 @@ async fn run_job(app: AppHandle, req: JobRequest, mut cancel: watch::Receiver<bo
                 }
             }
             ProbeOutcome::Cancelled => {
-                emit_failed(&app, &job_id, "Cancelled");
+                cancelled(&app);
                 return;
             }
             ProbeOutcome::Failed(e) => {
-                emit_failed(&app, &job_id, format!("Resolve failed — {e}"));
+                fail(&app, &format!("Resolve failed — {e}"));
                 return;
             }
         }
     }
     if *cancel.borrow() {
-        emit_failed(&app, &job_id, "Cancelled");
+        cancelled(&app);
         return;
     }
     emit_progress(&app, &job_id, RESOLVE_END, 0);
 
-    // ---- Phase 4: Original/Song runs for real; other targets stay simulated ----
+    // Done helper — sets title, emits event, fires notification, surfaces save dir.
+    let finish_done = |app: &AppHandle, outputs: Vec<OutputItem>| {
+        set_window_title(app, "Cigs — Done");
+        let body = match outputs.first().and_then(|o| o.path.as_ref()) {
+            Some(p) => {
+                let dir = std::path::Path::new(p)
+                    .parent()
+                    .and_then(|d| d.file_name())
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Desktop".into());
+                format!("Saved to {dir}")
+            }
+            None => "Job complete".to_string(),
+        };
+        notify_done(app, &effective_title, &body);
+        emit_done(app, &job_id, &effective_title, outputs);
+    };
+
+    // ---- dispatch ----
+    // Real pipelines: Original/Song and Instrumental.
+    // Everything else still walks the simulated spine until Phase 5.
     if req.target.contains("Original") {
         match run_original_song(&app, &req, &effective_title, duration_secs, &mut cancel).await {
-            Ok(outputs) => emit_done(&app, &job_id, &effective_title, outputs),
-            Err(RunError::Cancelled) => emit_failed(&app, &job_id, "Cancelled"),
-            Err(RunError::Failed(e)) => emit_failed(&app, &job_id, e),
+            Ok(outputs) => finish_done(&app, outputs),
+            Err(RunError::Cancelled) => cancelled(&app),
+            Err(RunError::Failed(e)) => fail(&app, &e),
+        }
+        return;
+    }
+    if req.target == "Instrumental" {
+        // Video branch shouldn't reach Instrumental (UI gates this in targetsForBranch),
+        // but be defensive — fail explicit rather than silently downloading audio.
+        if req.branch == "Video" {
+            fail(&app, "Instrumental needs the Audio branch (no video container).");
+            return;
+        }
+        match run_instrumental(&app, &req, &effective_title, duration_secs, &mut cancel).await {
+            Ok(outputs) => finish_done(&app, outputs),
+            Err(RunError::Cancelled) => cancelled(&app),
+            Err(RunError::Failed(e)) => fail(&app, &e),
         }
         return;
     }
 
-    // ---- simulated walk: Transcript / Stems / Vocals / Instrumental ----
+    // ---- simulated walk: Transcript / Stems / Vocals ----
     let total = STAGES.len();
     for i in 1..total {
         if *cancel.borrow() {
-            emit_failed(&app, &job_id, "Cancelled");
+            cancelled(&app);
             return;
         }
         emit_stage(&app, &job_id, i);
@@ -744,7 +950,7 @@ async fn run_job(app: AppHandle, req: JobRequest, mut cancel: watch::Receiver<bo
         let end = (i + 1) as f64 * STAGE_SPAN;
         for s in 1..=6 {
             if *cancel.borrow() {
-                emit_failed(&app, &job_id, "Cancelled");
+                cancelled(&app);
                 return;
             }
             tokio::time::sleep(Duration::from_millis(180)).await;
@@ -756,10 +962,10 @@ async fn run_job(app: AppHandle, req: JobRequest, mut cancel: watch::Receiver<bo
         &app,
         &job_id,
         "info",
-        "Simulated pipeline complete — Transcript/Stems gain real engines in Phase 5",
+        "Preview pipeline — Transcript / Stems / Vocals land for real in Phase 5",
     );
     let outputs = build_outputs(&req, &effective_title);
-    emit_done(&app, &job_id, &effective_title, outputs);
+    finish_done(&app, outputs);
 }
 
 /// UI→engine: start a job. Returns the `jobId` immediately and drives the work

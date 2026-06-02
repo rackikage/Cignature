@@ -16,14 +16,14 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
-# Only what the engine actually uses today. Future-prep deps were removed
-# (tauri-plugin-dialog/opener, uuid, thiserror, once_cell, anyhow) — they
-# slowed builds for no value and confused the next reader. Re-add when wired.
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
+# P4 native feel — system notification on job done; Finder reveal on output click.
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
 tokio = { version = "1", features = ["full"] }
 dirs = "5"
 which = "6"

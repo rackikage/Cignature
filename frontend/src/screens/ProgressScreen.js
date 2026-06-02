@@ -77,12 +77,12 @@ export default function ProgressScreen() {
                 <span className="h-2 w-2 rounded-full bg-live cigs-pulse" />
                 <div>
                   <div className="text-sm font-medium text-foreground">{STAGES[activeIndex]?.label}</div>
-                  <div className="mono text-[11px] text-muted-foreground">Simulated pipeline — timings are mocked · stage {activeIndex + 1} of {STAGES.length}</div>
+                  <div className="mono text-[11px] text-muted-foreground">Stage {activeIndex + 1} of {STAGES.length}</div>
                 </div>
               </div>
             )}
             {isPending && (
-              <div className="text-sm text-muted-foreground">Waiting in queue — would begin at the resolver stage.</div>
+              <div className="text-sm text-muted-foreground">Waiting in queue — starts at the resolver stage.</div>
             )}
             {isDone && (
               <div className="flex items-center justify-between gap-3">
