@@ -303,8 +303,15 @@ export const CigsProvider = ({ children }) => {
     }
   }, []);
 
+  // Dark-only: setTheme is a stub — no light mode in Cigs.
+  // Exposed so SettingsScreen renders without errors; clicking "Light" explains the design.
+  const setTheme = useCallback((t) => {
+    if (t === "light") toast("Cigs is dark-only — no light mode");
+  }, []);
+
   const value = {
     theme: "dark",
+    setTheme,
     screen,
     navigate,
     selectedJobId,
