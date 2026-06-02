@@ -212,25 +212,74 @@ fn ffmpeg_bin() -> PathBuf {
     which::which("ffmpeg").unwrap_or_else(|_| "ffmpeg".into())
 }
 
+/// Outcome of stage 0 — distinguishes cancel from failure so the runner can
+/// emit the right terminal event.
+enum ProbeOutcome {
+    Ok((Option<String>, Option<f64>)),
+    Failed(String),
+    Cancelled,
+}
+
 /// Real `yt-dlp` metadata probe — no download, just the JSON dump.
-/// Returns (title, duration_seconds) when available.
-async fn probe_metadata(source: &str) -> anyhow::Result<(Option<String>, Option<f64>)> {
-    let output = tokio::process::Command::new(ytdlp_bin())
-        .args(["--no-warnings", "--dump-single-json", "--skip-download", source])
-        .output()
-        .await?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let first = stderr.lines().next().unwrap_or("yt-dlp failed").trim();
-        anyhow::bail!("{}", first);
+/// Cancellable via the watcher; bounded by a 30s timeout so a hung yt-dlp
+/// can't pin a job forever at stage 0.
+async fn probe_metadata(source: &str, cancel: &mut watch::Receiver<bool>) -> ProbeOutcome {
+    use tokio::io::AsyncReadExt;
+    let mut cmd = tokio::process::Command::new(ytdlp_bin());
+    cmd.args(["--no-warnings", "--dump-single-json", "--skip-download", source])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return ProbeOutcome::Failed(format!("spawn failed: {e}")),
+    };
+    let mut stdout = child.stdout.take().expect("stdout piped");
+    let mut stderr = child.stderr.take().expect("stderr piped");
+
+    // Drain stdout+stderr concurrently; resolves when yt-dlp closes both pipes
+    // (i.e. has effectively exited). The borrow split below (stdout/stderr
+    // were `take()`d) leaves `&mut child` free for terminate_child() in the
+    // cancel/timeout arms.
+    let read_both = async move {
+        let mut o = Vec::new();
+        let mut e = Vec::new();
+        let _ = tokio::join!(stdout.read_to_end(&mut o), stderr.read_to_end(&mut e));
+        (o, e)
+    };
+    tokio::pin!(read_both);
+    let timeout = tokio::time::sleep(Duration::from_secs(30));
+    tokio::pin!(timeout);
+
+    let (out_buf, err_buf) = tokio::select! {
+        biased;
+        _ = wait_for_cancel(cancel) => {
+            terminate_child(&mut child).await;
+            return ProbeOutcome::Cancelled;
+        }
+        _ = &mut timeout => {
+            terminate_child(&mut child).await;
+            return ProbeOutcome::Failed("Resolve timed out after 30s".into());
+        }
+        bufs = &mut read_both => bufs,
+    };
+
+    let status = match child.wait().await {
+        Ok(s) => s,
+        Err(e) => return ProbeOutcome::Failed(e.to_string()),
+    };
+    if !status.success() {
+        let stderr_str = String::from_utf8_lossy(&err_buf);
+        let first = stderr_str.lines().next().unwrap_or("yt-dlp failed").trim();
+        return ProbeOutcome::Failed(first.to_string());
     }
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    let title = json
-        .get("title")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    let json: serde_json::Value = match serde_json::from_slice(&out_buf) {
+        Ok(j) => j,
+        Err(e) => return ProbeOutcome::Failed(format!("parse: {e}")),
+    };
+    let title = json.get("title").and_then(|v| v.as_str()).map(String::from);
     let duration = json.get("duration").and_then(|v| v.as_f64());
-    Ok((title, duration))
+    ProbeOutcome::Ok((title, duration))
 }
 
 fn fmt_dur(secs: f64) -> String {
@@ -646,8 +695,8 @@ async fn run_job(app: AppHandle, req: JobRequest, mut cancel: watch::Receiver<bo
         emit_log(&app, &job_id, "info", "Local file source — skipping URL resolve");
     } else {
         emit_log(&app, &job_id, "info", format!("Resolving {}", req.source));
-        match probe_metadata(&req.source).await {
-            Ok((title, duration)) => {
+        match probe_metadata(&req.source, &mut cancel).await {
+            ProbeOutcome::Ok((title, duration)) => {
                 if let Some(t) = &title {
                     emit_log(&app, &job_id, "info", format!("Resolved: {t}"));
                     effective_title = t.clone();
@@ -657,7 +706,11 @@ async fn run_job(app: AppHandle, req: JobRequest, mut cancel: watch::Receiver<bo
                     duration_secs = Some(d);
                 }
             }
-            Err(e) => {
+            ProbeOutcome::Cancelled => {
+                emit_failed(&app, &job_id, "Cancelled");
+                return;
+            }
+            ProbeOutcome::Failed(e) => {
                 emit_failed(&app, &job_id, format!("Resolve failed — {e}"));
                 return;
             }

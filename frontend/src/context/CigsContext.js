@@ -126,10 +126,22 @@ export const CigsProvider = ({ children }) => {
     });
   }, [jobs, addLog]);
 
+  // Mirror current jobs into a ref so engine event handlers can read state
+  // without re-subscribing. Stale-by-one-render at worst (acceptable for the
+  // guards below: missing a guard would just re-allow a toast we'd otherwise
+  // have suppressed — strictly better than today's unconditional toast).
+  const jobsRef = useRef(jobs);
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
   // ---- real engine events (Tauri only) ----
   // Subscribe once to the job://* stream and fold each event into job/log state.
-  // Updates to jobs already in a terminal state (completed/failed) are ignored
-  // so a user cancel sticks even though the background task keeps emitting.
+  // Updates to jobs already in a terminal state are ignored so a user cancel
+  // sticks even though the background task keeps emitting. Toasts on done/failed
+  // are also gated by the pre-event state so the cancel race doesn't fire a
+  // misleading "Finished X" after the user just cancelled, and a user-initiated
+  // cancel doesn't double-toast ("Cancelling X" + "Job failed — Cancelled").
   useEffect(() => {
     if (!IS_TAURI) return;
     const isTerminal = (s) => s === "completed" || s === "failed";
@@ -158,6 +170,11 @@ export const CigsProvider = ({ children }) => {
         }),
         listen("job://done", (e) => {
           const { jobId, title, outputs } = e.payload;
+          const pre = jobsRef.current.find((x) => x.id === jobId);
+          // Race-loser: cancel beat us in. Drop the event entirely — no state
+          // change, no toast. The engine's own post-success cancel-check has
+          // already removed the output file.
+          if (!pre || isTerminal(pre.state)) return;
           setJobs((prev) =>
             prev.map((j) => {
               if (j.id !== jobId || isTerminal(j.state)) return j;
@@ -176,12 +193,22 @@ export const CigsProvider = ({ children }) => {
         }),
         listen("job://failed", (e) => {
           const { jobId, error } = e.payload;
+          const pre = jobsRef.current.find((x) => x.id === jobId);
+          // If the user already cancelled (we toasted "Cancelling X"), the
+          // engine's echo "Cancelled" doesn't need a second toast.
+          const userCancelEcho =
+            pre &&
+            pre.state === "failed" &&
+            pre.error === "Cancelled by user" &&
+            error === "Cancelled";
           setJobs((prev) =>
             prev.map((j) =>
               j.id === jobId ? { ...j, state: "failed", error, failedAt: Date.now() } : j
             )
           );
-          toast.error(`Job failed — ${truncate(error || "unknown error", 44)}`);
+          if (!userCancelEcho) {
+            toast.error(`Job failed — ${truncate(error || "unknown error", 44)}`);
+          }
         }),
       ]);
       // If the effect was torn down before listeners resolved (StrictMode),
