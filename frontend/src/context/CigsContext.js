@@ -7,6 +7,8 @@ import React, {
   useCallback,
 } from "react";
 import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   SEED_JOBS,
   SEED_LOGS,
@@ -24,6 +26,11 @@ export const useCigs = () => {
   if (!ctx) throw new Error("useCigs must be used within CigsProvider");
   return ctx;
 };
+
+// Running inside the Tauri native shell? In the browser demo this is false and
+// every action stays cosmetic (fake ticker + "would" copy). Under Tauri, jobs
+// are driven by the real Rust engine via invoke("start_job") + job://* events.
+const IS_TAURI = typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
 
 function sourceTitle(b) {
   if (b.sourceType === "file") return b.fileName || "Local file";
@@ -72,7 +79,9 @@ export const CigsProvider = ({ children }) => {
   }, []);
 
   // ---- demo progress ticker (visual only, no real work) ----
+  // Browser demo only — under Tauri the real engine drives progress via events.
   useEffect(() => {
+    if (IS_TAURI) return;
     const t = setInterval(() => {
       setJobs((prev) => {
         let changed = false;
@@ -101,11 +110,13 @@ export const CigsProvider = ({ children }) => {
     return () => clearInterval(t);
   }, []);
 
-  // fire side-effects (toast/log) when a job transitions to completed
+  // fire side-effects (toast/log) when a job transitions to completed.
+  // Browser demo only — under Tauri the job://done handler does this for real.
   const completedRef = useRef(
     new Set(SEED_JOBS.filter((j) => j.state === "completed").map((j) => j.id))
   );
   useEffect(() => {
+    if (IS_TAURI) return;
     jobs.forEach((j) => {
       if (j.state === "completed" && !completedRef.current.has(j.id)) {
         completedRef.current.add(j.id);
@@ -114,6 +125,83 @@ export const CigsProvider = ({ children }) => {
       }
     });
   }, [jobs, addLog]);
+
+  // ---- real engine events (Tauri only) ----
+  // Subscribe once to the job://* stream and fold each event into job/log state.
+  // Updates to jobs already in a terminal state (completed/failed) are ignored
+  // so a user cancel sticks even though the background task keeps emitting.
+  useEffect(() => {
+    if (!IS_TAURI) return;
+    const isTerminal = (s) => s === "completed" || s === "failed";
+    const unlisteners = [];
+    let disposed = false;
+
+    const subscribe = async () => {
+      const subs = await Promise.all([
+        listen("job://stage", (e) => {
+          const { jobId, stageIndex } = e.payload;
+          setJobs((prev) =>
+            prev.map((j) => (j.id === jobId && !isTerminal(j.state) ? { ...j, stageIndex } : j))
+          );
+        }),
+        listen("job://progress", (e) => {
+          const { jobId, progress, stageIndex } = e.payload;
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === jobId && !isTerminal(j.state) ? { ...j, progress, stageIndex } : j
+            )
+          );
+        }),
+        listen("job://log", (e) => {
+          const { jobId, level, message } = e.payload;
+          addLog(level, message, jobId);
+        }),
+        listen("job://done", (e) => {
+          const { jobId, title, outputs } = e.payload;
+          setJobs((prev) =>
+            prev.map((j) => {
+              if (j.id !== jobId || isTerminal(j.state)) return j;
+              return {
+                ...j,
+                title: title && title.length ? title : j.title,
+                state: "completed",
+                progress: 100,
+                stageIndex: STAGES.length - 1,
+                completedAt: Date.now(),
+                outputs: outputs && outputs.length ? outputs : buildOutputs(j),
+              };
+            })
+          );
+          toast.success(`Finished "${truncate(title || "job", 30)}"`);
+        }),
+        listen("job://failed", (e) => {
+          const { jobId, error } = e.payload;
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === jobId ? { ...j, state: "failed", error, failedAt: Date.now() } : j
+            )
+          );
+          toast.error(`Job failed — ${truncate(error || "unknown error", 44)}`);
+        }),
+      ]);
+      // If the effect was torn down before listeners resolved (StrictMode),
+      // immediately detach; otherwise keep them for cleanup.
+      if (disposed) subs.forEach((u) => u());
+      else unlisteners.push(...subs);
+    };
+    subscribe();
+
+    return () => {
+      disposed = true;
+      unlisteners.forEach((u) => {
+        try {
+          u();
+        } catch {
+          /* already detached */
+        }
+      });
+    };
+  }, [addLog]);
 
   // ---- builder helpers ----
   const patchBuilder = useCallback((patch) => {
@@ -172,17 +260,50 @@ export const CigsProvider = ({ children }) => {
     createdAt: Date.now(),
   });
 
+  // Kick a job into the real Rust engine (Tauri only). The command returns the
+  // jobId immediately; all progress arrives back through the job://* listeners.
+  const engineStart = useCallback(
+    (job) => {
+      invoke("start_job", {
+        req: {
+          jobId: job.id,
+          title: job.title,
+          source: job.source,
+          sourceType: job.sourceType,
+          branch: job.branch,
+          target: job.target,
+          quality: job.quality,
+        },
+      }).catch((err) => {
+        const msg = String(err);
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === job.id ? { ...j, state: "failed", error: msg, failedAt: Date.now() } : j
+          )
+        );
+        addLog("error", `Engine refused job — ${msg}`, job.id);
+        toast.error("Engine could not start the job");
+      });
+    },
+    [addLog]
+  );
+
   const startJob = useCallback(() => {
     if (!validateBuilder(builder)) return;
     const job = makeJob(builder, "running");
     setJobs((prev) => [job, ...prev]);
-    addLog("info", `URL parsed — would start ${job.branch} pipeline`, job.id);
-    addLog("info", `${job.branch} · ${job.target} · ${job.quality} preset selected`, job.id);
-    toast.success(`Would start ${job.branch} job with ${job.quality} quality`);
     setSelectedJobId(job.id);
     setScreen("progress");
+    if (IS_TAURI) {
+      addLog("info", `Starting ${job.branch} · ${job.target} · ${job.quality}`, job.id);
+      engineStart(job);
+    } else {
+      addLog("info", `URL parsed — would start ${job.branch} pipeline`, job.id);
+      addLog("info", `${job.branch} · ${job.target} · ${job.quality} preset selected`, job.id);
+      toast.success(`Would start ${job.branch} job with ${job.quality} quality`);
+    }
     resetBuilder();
-  }, [builder, addLog, validateBuilder, resetBuilder]);
+  }, [builder, addLog, validateBuilder, resetBuilder, engineStart]);
 
   const addToQueue = useCallback(() => {
     if (!validateBuilder(builder)) return;
@@ -196,36 +317,48 @@ export const CigsProvider = ({ children }) => {
   // ---- job actions (cosmetic only) ----
   const startQueued = useCallback(
     (id) => {
+      const j = jobs.find((x) => x.id === id);
       setJobs((prev) =>
-        prev.map((j) =>
-          j.id === id ? { ...j, state: "running", progress: 4, stageIndex: 0, holdAt: 100 } : j
+        prev.map((x) =>
+          x.id === id
+            ? { ...x, state: "running", progress: 4, stageIndex: 0, holdAt: 100, error: null }
+            : x
         )
       );
-      const j = jobs.find((x) => x.id === id);
-      addLog("info", `Would begin local processing for "${j?.title}"`, id);
-      toast.success(`Would start "${truncate(j?.title || "job", 28)}"`);
       setSelectedJobId(id);
       setScreen("progress");
+      if (IS_TAURI && j) {
+        addLog("info", `Starting "${j.title}"`, id);
+        engineStart(j);
+      } else {
+        addLog("info", `Would begin local processing for "${j?.title}"`, id);
+        toast.success(`Would start "${truncate(j?.title || "job", 28)}"`);
+      }
     },
-    [jobs, addLog]
+    [jobs, addLog, engineStart]
   );
 
   const retryJob = useCallback(
     (id) => {
+      const j = jobs.find((x) => x.id === id);
       setJobs((prev) =>
-        prev.map((j) =>
-          j.id === id
-            ? { ...j, state: "running", progress: 4, stageIndex: 0, holdAt: 100, error: null }
-            : j
+        prev.map((x) =>
+          x.id === id
+            ? { ...x, state: "running", progress: 4, stageIndex: 0, holdAt: 100, error: null }
+            : x
         )
       );
-      const j = jobs.find((x) => x.id === id);
-      addLog("info", `Would retry "${j?.title}" from the start`, id);
-      toast.success(`Would retry "${truncate(j?.title || "job", 28)}"`);
       setSelectedJobId(id);
       setScreen("progress");
+      if (IS_TAURI && j) {
+        addLog("info", `Retrying "${j.title}"`, id);
+        engineStart(j);
+      } else {
+        addLog("info", `Would retry "${j?.title}" from the start`, id);
+        toast.success(`Would retry "${truncate(j?.title || "job", 28)}"`);
+      }
     },
-    [jobs, addLog]
+    [jobs, addLog, engineStart]
   );
 
   const cancelJob = useCallback(
