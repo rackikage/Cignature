@@ -60,7 +60,12 @@ export const Sidebar = () => {
                 <Icon className="h-[18px] w-[18px]" />
                 <span className="text-[9px] font-medium tracking-wide">{item.label}</span>
                 {badge && (
-                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                  <span
+                    className={cn(
+                      "absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold",
+                      item.key === "progress" ? "bg-live text-live-foreground" : "bg-warning text-warning-foreground"
+                    )}
+                  >
                     {badge}
                   </span>
                 )}

@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Trash2, ArrowUpDown, Plus, Inbox } from "lucide-react";
 
 const GROUPS = [
-  { key: "running", label: "Running" },
-  { key: "pending", label: "Pending" },
-  { key: "completed", label: "Completed" },
-  { key: "failed", label: "Failed" },
+  { key: "running", label: "Running", dot: "bg-live" },
+  { key: "pending", label: "Pending", dot: "bg-warning" },
+  { key: "completed", label: "Completed", dot: "bg-success" },
+  { key: "failed", label: "Failed", dot: "bg-destructive" },
 ];
 
 export default function QueueScreen() {
@@ -22,7 +22,7 @@ export default function QueueScreen() {
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground">Queue</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{jobs.length} job{jobs.length !== 1 ? "s" : ""} · grouped by state</p>
+            <p className="mt-1 text-sm text-muted-foreground">{jobs.length} job{jobs.length !== 1 ? "s" : ""} in flight, grouped by state</p>
           </div>
           <div className="flex items-center gap-2">
             <Button data-testid="queue-reorder-button" variant="outline" size="sm" className="gap-1.5" onClick={reorderHint}>
@@ -43,6 +43,7 @@ export default function QueueScreen() {
             return (
               <section key={g.key} data-testid={`queue-group-${g.key}`}>
                 <div className="mb-2 flex items-center gap-2">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", g.dot)} />
                   <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</h2>
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-bold text-muted-foreground">{items.length}</span>
                   <div className="h-px flex-1 bg-border" />

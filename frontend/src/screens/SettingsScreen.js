@@ -27,7 +27,7 @@ export default function SettingsScreen() {
       <div className="mx-auto max-w-[860px] p-6">
         <div className="mb-5">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Preferences for the future local pipeline. Visual only in this prototype.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Preferences for the local pipeline — applied when the engine lands.</p>
         </div>
 
         <div className="space-y-5">
@@ -72,7 +72,7 @@ export default function SettingsScreen() {
                     <div className="mono text-[10px] text-muted-foreground">v{t.version}</div>
                   </div>
                   {t.status === "ready" ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                       <CheckCircle2 className="h-3 w-3" /> Ready
                     </span>
                   ) : (

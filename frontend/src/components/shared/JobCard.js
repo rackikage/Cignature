@@ -41,11 +41,11 @@ export const JobCard = ({ job, onSelect }) => {
 
   const accent =
     job.state === "running"
-      ? "before:bg-primary"
+      ? "before:bg-live"
       : job.state === "failed"
       ? "before:bg-destructive"
       : job.state === "completed"
-      ? "before:bg-primary/40"
+      ? "before:bg-success/60"
       : "before:bg-border";
 
   return (
@@ -77,11 +77,11 @@ export const JobCard = ({ job, onSelect }) => {
           {job.state === "running" && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span className="text-primary">{STAGES[job.stageIndex]?.label}</span>
+                <span className="text-live">{STAGES[job.stageIndex]?.label}</span>
                 <span className="tabular text-foreground">{Math.round(job.progress)}%</span>
               </div>
               <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${job.progress}%` }} />
+                <div className="h-full rounded-full bg-live transition-[width] duration-500" style={{ width: `${job.progress}%` }} />
               </div>
             </div>
           )}
