@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Cigs default capabilities — core IPC, Finder reveal, system notifications.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:allow-reveal-item-in-dir",
+    "notification:default"
+  ]
+}

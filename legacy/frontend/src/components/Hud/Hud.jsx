@@ -37,6 +37,12 @@ export const Hud = ({ value, onSelect, runningJob, hint }) => {
   const arcAngle = selectedIndex >= 0 ? selectedIndex * STEP : 0;
   const CoreIcon = value ? ICONS[value] : Crosshair;
   const pct = runningJob ? Math.round(runningJob.progress) : 0;
+  // Round progress ring — violet at 0° transitioning to magenta at the fill
+  // edge, then a quiet rail for the unfilled remainder. Centre stays empty
+  // during an active job — the ring is the signal.
+  const activeRing = runningJob
+    ? `conic-gradient(from -90deg, hsl(var(--primary)) 0%, hsl(var(--live)) ${pct}%, hsl(var(--muted) / 0.55) ${pct}% 100%)`
+    : null;
 
   return (
     <div
@@ -135,7 +141,9 @@ export const Hud = ({ value, onSelect, runningJob, hint }) => {
           }}
         />
 
-        {/* center core — context-aware focal point, parallaxes with the cursor */}
+        {/* center core — context-aware focal point, parallaxes with the cursor.
+            Active: round violet→magenta progress ring, empty centre (the ring
+            IS the signal). Idle: branch icon + caption. */}
         <div
           data-testid="hud-core"
           className={cn(
@@ -145,20 +153,13 @@ export const Hud = ({ value, onSelect, runningJob, hint }) => {
           style={{
             transform:
               "translate(-50%, -50%) translate3d(calc(var(--hud-mx, 0) * 9px), calc(var(--hud-my, 0) * 9px), 0)",
-            ...(runningJob
-              ? { backgroundImage: `conic-gradient(hsl(var(--live)) ${pct}%, hsl(var(--muted)) ${pct}% 100%)` }
+            ...(activeRing
+              ? { backgroundImage: activeRing }
               : { backgroundColor: "hsl(var(--card))" }),
           }}
         >
           <div className="absolute inset-[3px] flex flex-col items-center justify-center rounded-full bg-card px-2 text-center">
-            {runningJob ? (
-              <>
-                <span className="mono text-[16px] font-bold tabular text-foreground">{pct}%</span>
-                <span className="w-full truncate text-[9px] font-medium leading-tight text-muted-foreground">
-                  {runningJob.title}
-                </span>
-              </>
-            ) : (
+            {runningJob ? null : (
               <>
                 <CoreIcon className={cn("h-5 w-5", value ? "text-primary" : "text-muted-foreground")} />
                 <span
