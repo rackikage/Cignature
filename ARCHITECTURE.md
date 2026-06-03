@@ -318,11 +318,11 @@ Options: rotate by recency (last 50 jobs regardless of source), or by distinct U
 
 Recommended path pending Phase 8 testing: by recency.
 
-### D-006 — Window dimensions (pending)
+### D-006 — Window dimensions (resolved)
 
-**Status:** Open. Resolved during Phase 9.
+**Status:** Resolved during Phase 3. **960×720, non-resizable.**
 
-Target ~960×640. Real number lands after HUD visual design in Phase 3 and copy pass in Phase 9.
+Rationale: the HUD frame is 360×360 with a 56px label-overflow padding on each side (FRAME_SIZE = 472), leaving room above for the URL field and below for the primary CTA without crowding. 640px tall (the original Phase 2 guess) put the top branch-arc label on top of the URL field. 720px gives ~40px of gap above and below the HUD frame inside `justify-between`, which feels deliberate without looking empty. Phase 9 copy pass may revisit, but the doctrine commits to fixed dimensions and this is the value.
 
 ### D-007 — Reveal-in-Finder API (pending)
 
