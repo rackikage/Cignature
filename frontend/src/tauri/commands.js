@@ -40,3 +40,34 @@ export function onJobEvent(handler) {
   p.then((fn) => { unlisten = fn })
   return () => { if (unlisten) unlisten() }
 }
+
+export async function setupStatus() {
+  return invoke('setup_status')
+}
+
+export async function installDemucs() {
+  return invoke('install_demucs')
+}
+
+export function onSetupEvent(handler) {
+  let unlisten = null
+  const p = listen('setup://event', (e) => handler(e.payload))
+  p.then((fn) => { unlisten = fn })
+  return () => { if (unlisten) unlisten() }
+}
+
+export async function getSettings() {
+  return invoke('get_settings')
+}
+
+export async function pickOutputFolder() {
+  return invoke('pick_output_folder')
+}
+
+export async function setOutputFolder(path) {
+  return invoke('set_output_folder', { path })
+}
+
+export async function clearHistory() {
+  return invoke('clear_history')
+}

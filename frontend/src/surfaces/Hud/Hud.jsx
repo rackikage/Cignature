@@ -21,7 +21,7 @@ const IDLE_DRIFT = {
   transition: { duration: 9, ease: 'easeInOut', repeat: Infinity },
 }
 
-export function Hud({ state = 'idle', progress = 0, selectedBranch, onSelectBranch }) {
+export function Hud({ state = 'idle', progress = 0, selectedBranch, onSelectBranch, gatedBranches = [] }) {
   const reducedMotion = useReducedMotion() === true
   const running = state === 'running'
   const done = state === 'done'
@@ -68,6 +68,7 @@ export function Hud({ state = 'idle', progress = 0, selectedBranch, onSelectBran
             selectedId={selectedBranch}
             onSelect={onSelectBranch}
             dimmed={running || done}
+            gatedIds={gatedBranches}
           />
         </motion.div>
       </motion.div>

@@ -10,6 +10,13 @@ use crate::paths;
 use super::audio;
 use super::fetch;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartArgs {
+    pub url: String,
+    pub branch: Branch,
+    pub output_folder: PathBuf,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Branch {
@@ -117,12 +124,6 @@ impl JobHandle {
 
 /// Active running job singleton — strict serial concurrency per doctrine.
 pub type ActiveJob = Arc<Mutex<Option<JobHandle>>>;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StartArgs {
-    pub url: String,
-    pub branch: Branch,
-}
 
 /// Stage weights for progress smoothing across the full job.
 /// Audio: fetch dominates. Transcript: fetch + transcribe.
@@ -237,7 +238,13 @@ pub async fn run_job<F>(
         progress: proc_start,
     });
 
-    let desktop = paths::desktop_dir();
+    // Output folder comes from settings now; fall back to Desktop if missing.
+    let output_dir = if args.output_folder.is_dir() {
+        args.output_folder.clone()
+    } else {
+        paths::desktop_dir()
+    };
+    let desktop = output_dir;
     let safe_title = sanitize_filename(&probe.title);
 
     let output_path: PathBuf = match args.branch {
@@ -301,11 +308,100 @@ pub async fn run_job<F>(
             }
         }
         Branch::Vocals | Branch::Twin => {
-            // Demucs path lands in Phase 7. For now we surface as unavailable
-            // if demucs is missing so the doctrine holds.
-            let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-            emit(JobEvent::UrlUnavailable { id });
-            return;
+            if !super::separate::is_demucs_available() {
+                // Setup hasn't run. The UI gates these branches normally;
+                // if we got here something raced, so swallow as unavailable.
+                let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                emit(JobEvent::UrlUnavailable { id });
+                return;
+            }
+
+            // demucs needs a wav input it can decode; ffmpeg first.
+            let wav = work.join("source.demucs.wav");
+            if let Err(e) = audio::to_wav_16k_mono(&downloaded, &wav, &cancel).await {
+                match e {
+                    audio::AudioError::Cancelled => {
+                        let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                        emit(JobEvent::Cancelled { id });
+                        return;
+                    }
+                    audio::AudioError::Internal(e) => {
+                        log::error!("wav prep for demucs: {e}");
+                        let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                        emit(JobEvent::UrlUnavailable { id });
+                        return;
+                    }
+                }
+            }
+
+            let demucs_out = work.join("stems");
+            let emit_for_dem = Arc::clone(&emit);
+            let id_for_dem = id.clone();
+            let (vocals, instrumental) = match super::separate::split_vocals(
+                &wav,
+                &demucs_out,
+                move |p| {
+                    emit_for_dem(JobEvent::Progress {
+                        id: id_for_dem.clone(),
+                        stage: Stage::Processing,
+                        progress: proc_start + proc_span * p,
+                    });
+                },
+                &cancel,
+            )
+            .await
+            {
+                Ok(t) => t,
+                Err(super::separate::SeparateError::Cancelled) => {
+                    let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                    emit(JobEvent::Cancelled { id });
+                    return;
+                }
+                Err(super::separate::SeparateError::Internal(e)) => {
+                    log::error!("demucs: {e}");
+                    let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                    emit(JobEvent::UrlUnavailable { id });
+                    return;
+                }
+            };
+
+            if matches!(args.branch, Branch::Vocals) {
+                let target = desktop.join(format!("{safe_title} (Vocals).mp3"));
+                if let Err(e) = tokio::fs::copy(&vocals, &target).await {
+                    log::error!("copy vocals: {e}");
+                    let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                    emit(JobEvent::UrlUnavailable { id });
+                    return;
+                }
+                target
+            } else {
+                let target = desktop.join(format!("{safe_title} (Twin Pack).zip"));
+                let vocals_name = format!("{safe_title} (Vocals).mp3");
+                let instr_name = format!("{safe_title} (Instrumental).mp3");
+                match super::pack::zip_two(
+                    &vocals,
+                    &instrumental,
+                    &target,
+                    &vocals_name,
+                    &instr_name,
+                    &cancel,
+                )
+                .await
+                {
+                    Ok(p) => p,
+                    Err(super::pack::PackError::Cancelled) => {
+                        let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                        emit(JobEvent::Cancelled { id });
+                        return;
+                    }
+                    Err(super::pack::PackError::Internal(e)) => {
+                        log::error!("pack: {e}");
+                        let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
+                        emit(JobEvent::UrlUnavailable { id });
+                        return;
+                    }
+                }
+            }
         }
     };
 

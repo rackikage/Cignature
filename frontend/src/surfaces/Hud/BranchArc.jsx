@@ -17,12 +17,13 @@ const POSITIONS = {
   left:   { x: CENTER - HUD_RADIUS - LABEL_OFFSET, y: CENTER, align: 'right',  dx: '-100%', dy: '-50%' },
 }
 
-export function BranchArc({ selectedId, onSelect, dimmed = false }) {
+export function BranchArc({ selectedId, onSelect, dimmed = false, gatedIds = [] }) {
   return (
     <div className="absolute inset-0 pointer-events-none" aria-hidden={dimmed}>
       {BRANCHES.map((b) => {
         const pos = POSITIONS[b.position]
         const selected = selectedId === b.id
+        const gated = gatedIds.includes(b.id)
         return (
           <motion.button
             key={b.id}
@@ -48,11 +49,18 @@ export function BranchArc({ selectedId, onSelect, dimmed = false }) {
           >
             <div
               className={cn(
-                'text-sm tracking-tight transition-colors duration-200',
+                'text-sm tracking-tight transition-colors duration-200 flex items-center justify-center gap-1.5',
                 selected ? 'font-bold text-primary-bright' : 'font-normal text-text-muted hover:text-text',
+                gated && !selected && 'text-text-faint',
               )}
             >
               {b.label}
+              {gated && (
+                <span
+                  className="inline-block w-1.5 h-1.5 rounded-full bg-info/60"
+                  aria-label="needs setup"
+                />
+              )}
             </div>
             <div className="text-[11px] text-text-faint mt-0.5">{b.blurb}</div>
           </motion.button>
