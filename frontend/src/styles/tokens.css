@@ -1,0 +1,35 @@
+/* tokens — single source of truth for Cigs palette and motion.
+   doctrine: dark only, no light fallback. */
+
+:root {
+  /* surfaces — deep blue-violet near-black */
+  --bg: #0A0A14;
+  --surface: #11111E;
+  --surface-raise: #1A1A2E;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* text — white only, with weighted alpha for hierarchy */
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.32);
+
+  /* accent roles — each does exactly one job */
+  --primary: #7C5CFF;          /* identity, primary CTA, selected branch */
+  --primary-bright: #9D86FF;
+  --live: #FF4DBA;             /* running, in-progress */
+  --success: #34D399;          /* completed, ready, done — nowhere else */
+  --info: #22D3EE;             /* links, hints, anti-duplicate note */
+  --destructive: #EF4444;      /* destructive confirm */
+
+  /* gradient — primary CTA and HUD ring only, never on surfaces */
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--live) 100%);
+
+  /* motion — keep aggressive easings, short durations.
+     hud drift/tilt is gated by prefers-reduced-motion in component code. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snap: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-normal: 200ms;
+  --dur-slow: 400ms;
+}
