@@ -20,17 +20,19 @@ import {
 const INITIAL = {
   url: '',
   urlStatus: 'idle',          // 'idle' | 'probing' | 'ok' | 'unavailable'
+  urlReason: null,            // 'private' | 'not-found' | 'network' | 'tool-missing' | 'unsupported' | null
   source: null,               // { title, platform, durationSec }
   selectedBranch: 'audio',    // one of 'audio' | 'transcript' | 'vocals' | 'twin'
   jobState: 'idle',           // 'idle' | 'running' | 'done' | 'cancelled'
   jobProgress: 0,             // 0..1
+  jobStage: null,             // 'fetching' | 'processing' | 'finalizing' | null
+  jobBranch: null,             // branch id of the active job (for stage labels)
   jobId: null,
   jobOutputPath: null,
   cancelConfirm: false,
   duplicateOf: null,          // { branch, completedAt } | null
-  // first-run setup (demucs)
+  // first-run setup (demucs) — kicked off automatically by checkSetup()
   setupStatus: 'unknown',     // 'unknown' | 'ready' | 'needs-demucs' | 'installing' | 'installed'
-  setupBannerDismissed: false,
   setupLine: '',              // tail of last pip output line
   setupError: null,
   // settings
@@ -69,6 +71,7 @@ export function setUrl(url) {
   set({
     url,
     urlStatus: url.trim().length === 0 ? 'idle' : 'probing',
+    urlReason: null,
     source: null,
   })
   if (url.trim().length === 0) return
@@ -93,6 +96,7 @@ async function runProbe(url) {
   if (result.status === 'ok') {
     set({
       urlStatus: 'ok',
+      urlReason: null,
       source: {
         title: result.title,
         platform: result.platform,
@@ -101,7 +105,12 @@ async function runProbe(url) {
       duplicateOf: result.duplicateOf ?? null,
     })
   } else {
-    set({ urlStatus: 'unavailable', source: null, duplicateOf: null })
+    set({
+      urlStatus: 'unavailable',
+      urlReason: result.reason ?? 'unsupported',
+      source: null,
+      duplicateOf: null,
+    })
   }
 }
 
@@ -113,7 +122,13 @@ export async function startSelectedJob() {
   const { url, selectedBranch, urlStatus, jobState } = state
   if (jobState !== 'idle') return
   if (!url.trim() || urlStatus !== 'ok') return
-  set({ jobState: 'running', jobProgress: 0, jobOutputPath: null })
+  set({
+    jobState: 'running',
+    jobProgress: 0,
+    jobStage: 'fetching',
+    jobBranch: selectedBranch,
+    jobOutputPath: null,
+  })
   const result = await startJob(url.trim(), selectedBranch).catch(() => null)
   if (result?.id) set({ jobId: result.id })
 }
@@ -153,27 +168,32 @@ export function startEngineSubscription() {
         set({ source: { title: ev.source.title, platform: ev.source.platform, durationSec: ev.source.durationSec } })
         break
       case 'progress':
-        set({ jobProgress: Math.max(state.jobProgress, ev.progress) })
+        set({
+          jobProgress: Math.max(state.jobProgress, ev.progress),
+          jobStage: ev.stage ?? state.jobStage,
+        })
         break
       case 'done':
-        set({ jobState: 'done', jobProgress: 1, jobOutputPath: ev.outputPath })
+        set({ jobState: 'done', jobProgress: 1, jobStage: 'finalizing', jobOutputPath: ev.outputPath })
         // auto-reveal in Finder per doctrine
         revealInFinder(ev.outputPath).catch(() => {})
-        // brief check, then back to idle
+        // hold the done state so the user actually sees the check + label
         setTimeout(() => {
-          set({ jobState: 'idle', jobProgress: 0, jobId: null })
-        }, 700)
+          set({ jobState: 'idle', jobProgress: 0, jobStage: null, jobBranch: null, jobId: null })
+        }, 1500)
         break
       case 'cancelled':
-        set({ jobState: 'idle', jobProgress: 0, jobId: null })
+        set({ jobState: 'idle', jobProgress: 0, jobStage: null, jobBranch: null, jobId: null })
         break
       case 'url-unavailable':
-        // engine-side failure surfaces as URL unavailable per doctrine
         set({
           jobState: 'idle',
           jobProgress: 0,
+          jobStage: null,
+          jobBranch: null,
           jobId: null,
           urlStatus: 'unavailable',
+          urlReason: ev.reason ?? 'unsupported',
           source: null,
         })
         break
@@ -198,11 +218,8 @@ export async function checkSetup() {
     set({ setupStatus: 'ready' })
     return
   }
+  // demucs missing just gates Vocals & Twin in the radial deck — no nagging UI.
   set({ setupStatus: s.demucs ? 'ready' : 'needs-demucs' })
-}
-
-export function dismissSetupBanner() {
-  set({ setupBannerDismissed: true })
 }
 
 export async function startSetupInstall() {
@@ -226,9 +243,9 @@ export function startSetupSubscription() {
         if (ev.text && ev.text.trim()) set({ setupLine: ev.text.trim().slice(0, 120) })
         break
       case 'install-done':
-        set({ setupStatus: 'installed', setupLine: 'Ready', setupBannerDismissed: false })
+        set({ setupStatus: 'installed', setupLine: 'Ready' })
         // promote to 'ready' after a beat so the banner can show "Installed" briefly
-        setTimeout(() => set({ setupStatus: 'ready' }), 1200)
+        setTimeout(() => set({ setupStatus: 'ready' }), 1400)
         break
       case 'install-failed':
         set({ setupStatus: 'needs-demucs', setupError: ev.reason || 'install failed' })

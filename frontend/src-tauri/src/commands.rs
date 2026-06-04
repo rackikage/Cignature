@@ -31,7 +31,9 @@ pub enum ProbeResult {
         #[serde(rename = "duplicateOf")]
         duplicate_of: Option<DuplicateInfo>,
     },
-    Unavailable,
+    Unavailable {
+        reason: crate::engine::fetch::UnavailableReason,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -57,7 +59,7 @@ pub async fn probe_url(state: State<'_, AppState>, url: String) -> Result<ProbeR
                 duplicate_of: dup,
             })
         }
-        Err(_) => Ok(ProbeResult::Unavailable),
+        Err(reason) => Ok(ProbeResult::Unavailable { reason }),
     }
 }
 

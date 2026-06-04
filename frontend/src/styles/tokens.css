@@ -4,15 +4,15 @@
 :root {
   /* surfaces — deep blue-violet near-black */
   --bg: #0A0A14;
-  --surface: #11111E;
-  --surface-raise: #1A1A2E;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --surface: #13132A;
+  --surface-raise: #1E1E36;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
 
   /* text — white only, with weighted alpha for hierarchy */
   --text: #FFFFFF;
-  --text-muted: rgba(255, 255, 255, 0.55);
-  --text-faint: rgba(255, 255, 255, 0.32);
+  --text-muted: rgba(255, 255, 255, 0.66);
+  --text-faint: rgba(255, 255, 255, 0.42);
 
   /* accent roles — each does exactly one job */
   --primary: #7C5CFF;          /* identity, primary CTA, selected branch */
@@ -24,6 +24,8 @@
 
   /* gradient — primary CTA and HUD ring only, never on surfaces */
   --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--live) 100%);
+  --ring-glow: 0 0 28px rgba(124, 92, 255, 0.45);
+  --success-glow: 0 0 18px rgba(52, 211, 153, 0.45);
 
   /* motion — keep aggressive easings, short durations.
      hud drift/tilt is gated by prefers-reduced-motion in component code. */

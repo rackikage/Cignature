@@ -21,7 +21,7 @@ const IDLE_DRIFT = {
   transition: { duration: 9, ease: 'easeInOut', repeat: Infinity },
 }
 
-export function Hud({ state = 'idle', progress = 0, selectedBranch, onSelectBranch, gatedBranches = [] }) {
+export function Hud({ state = 'idle', progress = 0, stage, jobBranch, selectedBranch, onSelectBranch, gatedBranches = [] }) {
   const reducedMotion = useReducedMotion() === true
   const running = state === 'running'
   const done = state === 'done'
@@ -62,7 +62,12 @@ export function Hud({ state = 'idle', progress = 0, selectedBranch, onSelectBran
             willChange: 'transform',
           }}
         >
-          <ProgressRing state={state} progress={progress} />
+          <ProgressRing
+            state={state}
+            progress={progress}
+            stage={stage}
+            branch={jobBranch ?? selectedBranch}
+          />
           {done && <DoneCheck />}
           <BranchArc
             selectedId={selectedBranch}

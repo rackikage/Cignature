@@ -29,8 +29,9 @@ export function BranchArc({ selectedId, onSelect, dimmed = false, gatedIds = [] 
             key={b.id}
             type="button"
             data-testid={`branch-${b.id}`}
-            onClick={() => onSelect?.(b.id)}
-            disabled={dimmed}
+            onClick={() => { if (!gated) onSelect?.(b.id) }}
+            disabled={dimmed || gated}
+            title={gated ? 'One-time setup needed for this branch' : undefined}
             initial={false}
             animate={{ opacity: dimmed ? 0.35 : 1 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
@@ -49,20 +50,20 @@ export function BranchArc({ selectedId, onSelect, dimmed = false, gatedIds = [] 
           >
             <div
               className={cn(
-                'text-sm tracking-tight transition-colors duration-200 flex items-center justify-center gap-1.5',
-                selected ? 'font-bold text-primary-bright' : 'font-normal text-text-muted hover:text-text',
-                gated && !selected && 'text-text-faint',
+                'text-[15px] tracking-tight transition-colors duration-200 flex items-center justify-center gap-1.5',
+                selected ? 'font-extrabold text-primary-bright' : 'font-semibold text-text hover:text-primary-bright',
+                gated && !selected && 'text-text-muted',
               )}
             >
               {b.label}
               {gated && (
                 <span
-                  className="inline-block w-1.5 h-1.5 rounded-full bg-info/60"
+                  className="inline-block w-1.5 h-1.5 rounded-full bg-info/70"
                   aria-label="needs setup"
                 />
               )}
             </div>
-            <div className="text-[11px] text-text-faint mt-0.5">{b.blurb}</div>
+            <div className="text-[12px] text-text-muted font-medium mt-0.5">{b.blurb}</div>
           </motion.button>
         )
       })}

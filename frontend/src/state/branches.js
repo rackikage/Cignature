@@ -23,8 +23,8 @@ export const BRANCHES = [
   },
   {
     id: 'twin',
-    label: 'Audio Twin Pack',
-    blurb: 'vocal + instrumental, zipped',
+    label: 'The Mr Loco',
+    blurb: 'instrumental + vocals',
     position: 'left',
   },
 ]

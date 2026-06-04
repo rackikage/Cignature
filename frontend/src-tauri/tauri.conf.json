@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Cigs",
-        "width": 960,
-        "height": 720,
+        "width": 970,
+        "height": 703,
         "resizable": false,
         "fullscreen": false,
         "titleBarStyle": "Overlay",

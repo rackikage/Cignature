@@ -68,6 +68,7 @@ pub enum JobEvent {
     },
     UrlUnavailable {
         id: String,
+        reason: super::fetch::UnavailableReason,
     },
 }
 
@@ -162,15 +163,8 @@ pub async fn run_job<F>(
     // 1) probe
     let probe = match fetch::probe(&args.url).await {
         Ok(p) => p,
-        Err(fetch::ProbeOutcome::Unavailable) => {
-            emit(JobEvent::UrlUnavailable { id });
-            return;
-        }
-        Err(fetch::ProbeOutcome::Internal) => {
-            // Doctrine: engine bugs are not user-facing. Surface as
-            // unavailable so the user sees one consistent failure line.
-            // (Diagnostic log lives in stderr.)
-            emit(JobEvent::UrlUnavailable { id });
+        Err(reason) => {
+            emit(JobEvent::UrlUnavailable { id, reason });
             return;
         }
     };
@@ -214,12 +208,12 @@ pub async fn run_job<F>(
         }
         Err(fetch::FetchError::Unavailable) => {
             let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-            emit(JobEvent::UrlUnavailable { id });
+            emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::NotFound });
             return;
         }
         Err(fetch::FetchError::Internal(_)) => {
             let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-            emit(JobEvent::UrlUnavailable { id });
+            emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::Network });
             return;
         }
     };
@@ -261,7 +255,7 @@ pub async fn run_job<F>(
                 Err(audio::AudioError::Internal(e)) => {
                     log::error!("audio internal: {e}");
                     let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                    emit(JobEvent::UrlUnavailable { id });
+                    emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                     return;
                 }
             }
@@ -279,7 +273,7 @@ pub async fn run_job<F>(
                     audio::AudioError::Internal(e) => {
                         log::error!("wav prep: {e}");
                         let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                        emit(JobEvent::UrlUnavailable { id });
+                        emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                         return;
                     }
                 }
@@ -302,17 +296,15 @@ pub async fn run_job<F>(
                 Err(super::transcribe::TranscribeError::Internal(e)) => {
                     log::error!("transcribe: {e}");
                     let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                    emit(JobEvent::UrlUnavailable { id });
+                    emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                     return;
                 }
             }
         }
         Branch::Vocals | Branch::Twin => {
             if !super::separate::is_demucs_available() {
-                // Setup hasn't run. The UI gates these branches normally;
-                // if we got here something raced, so swallow as unavailable.
                 let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                emit(JobEvent::UrlUnavailable { id });
+                emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ToolMissing });
                 return;
             }
 
@@ -328,7 +320,7 @@ pub async fn run_job<F>(
                     audio::AudioError::Internal(e) => {
                         log::error!("wav prep for demucs: {e}");
                         let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                        emit(JobEvent::UrlUnavailable { id });
+                        emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                         return;
                     }
                 }
@@ -360,7 +352,7 @@ pub async fn run_job<F>(
                 Err(super::separate::SeparateError::Internal(e)) => {
                     log::error!("demucs: {e}");
                     let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                    emit(JobEvent::UrlUnavailable { id });
+                    emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                     return;
                 }
             };
@@ -370,12 +362,12 @@ pub async fn run_job<F>(
                 if let Err(e) = tokio::fs::copy(&vocals, &target).await {
                     log::error!("copy vocals: {e}");
                     let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                    emit(JobEvent::UrlUnavailable { id });
+                    emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                     return;
                 }
                 target
             } else {
-                let target = desktop.join(format!("{safe_title} (Twin Pack).zip"));
+                let target = desktop.join(format!("{safe_title} (The Mr Loco).zip"));
                 let vocals_name = format!("{safe_title} (Vocals).mp3");
                 let instr_name = format!("{safe_title} (Instrumental).mp3");
                 match super::pack::zip_two(
@@ -397,7 +389,7 @@ pub async fn run_job<F>(
                     Err(super::pack::PackError::Internal(e)) => {
                         log::error!("pack: {e}");
                         let _ = tokio::fs::remove_dir_all(&cleanup_work).await;
-                        emit(JobEvent::UrlUnavailable { id });
+                        emit(JobEvent::UrlUnavailable { id, reason: fetch::UnavailableReason::ProcessingFailed });
                         return;
                     }
                 }

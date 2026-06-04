@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -6,32 +6,45 @@ use tokio::process::Command;
 
 use super::job::SourceProbe;
 
-/// yt-dlp probe — returns the source metadata before any download.
-/// Engine bug for any failure other than "the URL itself is unavailable";
-/// per doctrine we only surface unavailability to the user, no detail.
-pub async fn probe(url: &str) -> Result<SourceProbe, ProbeOutcome> {
-    let yt = which::which("yt-dlp").map_err(|_| ProbeOutcome::Internal)?;
+/// yt-dlp probe — returns metadata, or a categorised reason for failure.
+/// The frontend maps the reason to a directive user-friendly line.
+pub async fn probe(url: &str) -> Result<SourceProbe, UnavailableReason> {
+    let yt = match which::which("yt-dlp") {
+        Ok(p) => p,
+        Err(_) => return Err(UnavailableReason::ToolMissing),
+    };
 
-    let output = Command::new(&yt)
+    let trimmed = url.trim();
+    if !is_plausible_url(trimmed) {
+        return Err(UnavailableReason::Unsupported);
+    }
+
+    let output = match Command::new(&yt)
         .args([
             "--dump-single-json",
             "--no-warnings",
             "--no-playlist",
             "--skip-download",
-            url,
+            trimmed,
         ])
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .stdout(Stdio::piped())
         .output()
         .await
-        .map_err(|_| ProbeOutcome::Internal)?;
+    {
+        Ok(o) => o,
+        Err(_) => return Err(UnavailableReason::Network),
+    };
 
     if !output.status.success() {
-        return Err(ProbeOutcome::Unavailable);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(classify_yt_dlp_stderr(&stderr));
     }
 
-    let parsed: YtDlpJson =
-        serde_json::from_slice(&output.stdout).map_err(|_| ProbeOutcome::Unavailable)?;
+    let parsed: YtDlpJson = match serde_json::from_slice(&output.stdout) {
+        Ok(p) => p,
+        Err(_) => return Err(UnavailableReason::Unsupported),
+    };
 
     Ok(SourceProbe {
         title: parsed.title.unwrap_or_else(|| "Untitled".to_string()),
@@ -40,10 +53,41 @@ pub async fn probe(url: &str) -> Result<SourceProbe, ProbeOutcome> {
     })
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum ProbeOutcome {
-    Unavailable,
-    Internal,
+fn is_plausible_url(s: &str) -> bool {
+    s.starts_with("http://") || s.starts_with("https://") || s.starts_with("www.")
+}
+
+fn classify_yt_dlp_stderr(s: &str) -> UnavailableReason {
+    let l = s.to_ascii_lowercase();
+    if l.contains("private video") || l.contains("sign in") || l.contains("login required")
+        || l.contains("members-only") || l.contains("age-restricted")
+    {
+        UnavailableReason::Private
+    } else if l.contains("video unavailable") || l.contains("removed") || l.contains("not found")
+        || l.contains("does not exist") || l.contains("http error 404")
+    {
+        UnavailableReason::NotFound
+    } else if l.contains("unable to download") || l.contains("network is unreachable")
+        || l.contains("name or service not known") || l.contains("temporary failure")
+        || l.contains("getaddrinfo") || l.contains("ssl") || l.contains("connection")
+    {
+        UnavailableReason::Network
+    } else if l.contains("unsupported url") || l.contains("no suitable extractor") {
+        UnavailableReason::Unsupported
+    } else {
+        UnavailableReason::Unsupported
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum UnavailableReason {
+    Private,
+    NotFound,
+    Network,
+    ToolMissing,
+    Unsupported,
+    ProcessingFailed,
 }
 
 #[derive(Deserialize)]
