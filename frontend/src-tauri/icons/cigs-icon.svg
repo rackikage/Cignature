@@ -1,0 +1,85 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.44" r="0.66">
+      <stop offset="0" stop-color="#161D28"/>
+      <stop offset="0.6" stop-color="#0A0E15"/>
+      <stop offset="1" stop-color="#04060A"/>
+    </radialGradient>
+    <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F8FC"/>
+      <stop offset="0.16" stop-color="#C4CCD6"/>
+      <stop offset="0.40" stop-color="#6E7884"/>
+      <stop offset="0.52" stop-color="#373E49"/>
+      <stop offset="0.62" stop-color="#727C89"/>
+      <stop offset="0.84" stop-color="#D4DBE3"/>
+      <stop offset="1" stop-color="#89939F"/>
+    </linearGradient>
+    <radialGradient id="eyeglow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF4D1A" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#FF4D1A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="eye" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFE79C"/>
+      <stop offset="0.45" stop-color="#FF6A22"/>
+      <stop offset="1" stop-color="#A50F04"/>
+    </radialGradient>
+  </defs>
+
+  <!-- stormy background -->
+  <rect x="96" y="96" width="832" height="832" rx="196" fill="url(#bg)"/>
+  <!-- faint diagonal rain -->
+  <g stroke="#9FB2C8" stroke-width="3" opacity="0.06">
+    <line x1="300" y1="120" x2="180" y2="420"/>
+    <line x1="470" y1="120" x2="350" y2="420"/>
+    <line x1="640" y1="120" x2="520" y2="420"/>
+    <line x1="810" y1="160" x2="690" y2="460"/>
+    <line x1="880" y1="380" x2="770" y2="660"/>
+    <line x1="250" y1="520" x2="150" y2="780"/>
+  </g>
+  <rect x="96" y="96" width="832" height="832" rx="196" fill="none" stroke="#222B38" stroke-width="4"/>
+
+  <!-- flame mane (behind head) -->
+  <g fill="url(#chrome)" stroke="#07090D" stroke-width="5" stroke-linejoin="round">
+    <path d="M 486 352 C 560 280 648 250 712 232 C 660 300 612 352 540 408 Z"/>
+    <path d="M 540 392 C 636 332 724 318 792 312 C 712 360 648 404 566 452 Z"/>
+    <path d="M 574 452 C 676 446 766 470 828 492 C 742 506 666 524 580 520 Z"/>
+    <path d="M 568 520 C 668 548 740 590 786 632 C 700 612 626 604 552 580 Z"/>
+    <path d="M 540 580 C 612 632 654 690 676 744 C 600 700 548 660 500 612 Z"/>
+  </g>
+
+  <!-- upper head + snout (facing left) -->
+  <path d="M 236 492 C 290 458 330 452 372 442 C 420 430 452 400 478 360 C 502 396 540 398 570 420 C 612 450 620 500 598 538 C 584 562 560 572 534 568 L 474 526 C 430 512 356 516 296 522 C 270 518 250 508 236 492 Z"
+        fill="url(#chrome)" stroke="#07090D" stroke-width="9" stroke-linejoin="round"/>
+
+  <!-- lower jaw -->
+  <path d="M 300 544 C 364 552 436 552 496 560 C 530 564 556 578 562 602 C 548 628 518 636 488 632 C 432 624 360 620 312 606 C 290 598 286 568 300 544 Z"
+        fill="url(#chrome)" stroke="#07090D" stroke-width="9" stroke-linejoin="round"/>
+
+  <!-- teeth -->
+  <g fill="#EAF0F7" stroke="#07090D" stroke-width="3">
+    <polygon points="322,520 340,548 358,520"/>
+    <polygon points="374,522 392,550 410,522"/>
+    <polygon points="426,524 444,550 462,524"/>
+    <polygon points="332,560 350,536 368,560"/>
+    <polygon points="402,562 420,538 438,562"/>
+  </g>
+
+  <!-- nostril -->
+  <ellipse cx="270" cy="486" rx="9" ry="6" fill="#07090D" transform="rotate(-24 270 486)"/>
+
+  <!-- evil brow -->
+  <path d="M 356 428 C 408 404 460 408 500 430 C 466 440 416 448 382 464 C 370 454 360 442 356 428 Z" fill="#07090D"/>
+
+  <!-- eye -->
+  <circle cx="406" cy="456" r="48" fill="url(#eyeglow)"/>
+  <g transform="rotate(-20 406 456)">
+    <ellipse cx="406" cy="456" rx="31" ry="18" fill="url(#eye)"/>
+    <ellipse cx="406" cy="456" rx="7" ry="15" fill="#240400"/>
+  </g>
+
+  <!-- chrome sheen highlights -->
+  <g fill="none" stroke="#F4F8FC" stroke-width="6" stroke-linecap="round" opacity="0.65">
+    <path d="M 252 484 C 300 460 336 454 374 444"/>
+    <path d="M 492 360 C 520 300 560 270 606 252"/>
+  </g>
+</svg>
